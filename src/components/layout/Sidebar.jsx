@@ -10,10 +10,11 @@ import {
   ExternalLink,
   ChevronRight,
   ShieldCheck,
-  Sparkles
+  Sparkles,
+  X
 } from 'lucide-react'
 
-export default function Sidebar({ activeTab, setActiveTab }) {
+export default function Sidebar({ activeTab, setActiveTab, isMobileOpen, setIsMobileOpen }) {
   const navItems = [
     { id: 'dashboard', label: 'Visão Geral', icon: LayoutDashboard },
     { id: 'finances', label: 'Financeiro & Lucros', icon: TrendingUp },
@@ -24,18 +25,36 @@ export default function Sidebar({ activeTab, setActiveTab }) {
     { id: 'integrations', label: 'Integrações (Mercado Pago)', icon: CreditCard },
   ]
 
-  return (
-    <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between hidden md:flex min-h-screen">
+  const handleSelectTab = (tabId) => {
+    setActiveTab(tabId)
+    if (setIsMobileOpen) {
+      setIsMobileOpen(false)
+    }
+  }
+
+  const renderContent = () => (
+    <div className="flex flex-col justify-between h-full">
       <div>
-        {/* Brand Logo */}
-        <div className="p-6 border-b border-slate-800 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-            <Box className="w-6 h-6 text-white" />
+        {/* Brand Logo & Close Button */}
+        <div className="p-6 border-b border-slate-800 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+              <Box className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="font-bold text-lg text-white leading-tight">Infinity 3D</h1>
+              <span className="text-xs text-indigo-400 font-medium">Painel Admin</span>
+            </div>
           </div>
-          <div>
-            <h1 className="font-bold text-lg text-white leading-tight">Infinity 3D</h1>
-            <span className="text-xs text-indigo-400 font-medium">Painel Admin</span>
-          </div>
+
+          {setIsMobileOpen && (
+            <button
+              onClick={() => setIsMobileOpen(false)}
+              className="md:hidden p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          )}
         </div>
 
         {/* Navigation Links */}
@@ -51,7 +70,7 @@ export default function Sidebar({ activeTab, setActiveTab }) {
             return (
               <button
                 key={item.id}
-                onClick={() => setActiveTab(item.id)}
+                onClick={() => handleSelectTab(item.id)}
                 className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl font-medium text-sm transition-all duration-200 cursor-pointer ${
                   isActive
                     ? 'bg-indigo-600/15 text-indigo-400 border border-indigo-500/30 shadow-sm'
@@ -86,6 +105,32 @@ export default function Sidebar({ activeTab, setActiveTab }) {
           </span>
         </div>
       </div>
-    </aside>
+    </div>
+  )
+
+  return (
+    <>
+      {/* Desktop Sidebar */}
+      <aside className="w-64 bg-slate-900 border-r border-slate-800 hidden md:flex flex-col min-h-screen shrink-0 sticky top-0 h-screen">
+        {renderContent()}
+      </aside>
+
+      {/* Mobile Sidebar Overlay & Drawer */}
+      {isMobileOpen && (
+        <div className="md:hidden fixed inset-0 z-50 flex">
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm transition-opacity"
+            onClick={() => setIsMobileOpen(false)}
+          />
+
+          {/* Slide-out Drawer */}
+          <aside className="relative w-72 max-w-[80vw] bg-slate-900 border-r border-slate-800 h-full shadow-2xl flex flex-col z-10 animate-in slide-in-from-left duration-200">
+            {renderContent()}
+          </aside>
+        </div>
+      )}
+    </>
   )
 }
+

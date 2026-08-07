@@ -7,27 +7,36 @@ const corsHeaders = {
 }
 
 async function decrypt(encryptedBase64: string, secretKeyStr: string): Promise<string> {
-  const combined = Uint8Array.from(atob(encryptedBase64), c => c.charCodeAt(0))
-  const iv = combined.slice(0, 12)
-  const data = combined.slice(12)
-  
-  const encoder = new TextEncoder()
-  const keyData = encoder.encode(secretKeyStr.padEnd(32, '0').slice(0, 32))
-  const key = await crypto.subtle.importKey(
-    'raw',
-    keyData,
-    { name: 'AES-GCM' },
-    false,
-    ['decrypt']
-  )
-  
-  const decryptedBuffer = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv },
-    key,
-    data
-  )
-  
-  return new TextDecoder().decode(decryptedBuffer)
+  if (!encryptedBase64) return ''
+  if (encryptedBase64.startsWith('APP_USR-') || encryptedBase64.startsWith('TEST-') || encryptedBase64.startsWith('sb_')) {
+    return encryptedBase64
+  }
+
+  try {
+    const combined = Uint8Array.from(atob(encryptedBase64), c => c.charCodeAt(0))
+    const iv = combined.slice(0, 12)
+    const data = combined.slice(12)
+    
+    const encoder = new TextEncoder()
+    const keyData = encoder.encode(secretKeyStr.padEnd(32, '0').slice(0, 32))
+    const key = await crypto.subtle.importKey(
+      'raw',
+      keyData,
+      { name: 'AES-GCM' },
+      false,
+      ['decrypt']
+    )
+    
+    const decryptedBuffer = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv },
+      key,
+      data
+    )
+    
+    return new TextDecoder().decode(decryptedBuffer)
+  } catch (e) {
+    return encryptedBase64
+  }
 }
 
 serve(async (req) => {
@@ -42,19 +51,30 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    const { data: settings, error: settingsError } = await supabase
+    const { data: settings } = await supabase
       .from('store_settings')
-      .select('mercadopago_access_token_encrypted')
+      .select('mercadopago_access_token_encrypted, mercadopago_access_token')
       .single()
 
-    if (settingsError || !settings?.mercadopago_access_token_encrypted) {
+    let rawToken = settings?.mercadopago_access_token_encrypted || settings?.mercadopago_access_token
+
+    if (!rawToken) {
+      const { data: creds } = await supabase
+        .from('payment_credentials')
+        .select('access_token')
+        .eq('provider', 'mercado_pago')
+        .single()
+      rawToken = creds?.access_token
+    }
+
+    if (!rawToken) {
       return new Response(
-        JSON.stringify({ error: 'Configuração de pagamento via Mercado Pago não encontrada.' }),
+        JSON.stringify({ error: 'As chaves do Mercado Pago ainda não foram configuradas no Painel de Controle (Configurações ➔ Mercado Pago).' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    const accessToken = await decrypt(settings.mercadopago_access_token_encrypted, encryptionKey)
+    const accessToken = await decrypt(rawToken, encryptionKey)
 
     const { items, payer, successUrl, cancelUrl } = await req.json()
 
@@ -104,7 +124,7 @@ serve(async (req) => {
 
     if (!mpRes.ok) {
       return new Response(
-        JSON.stringify({ error: preferenceData.message || 'Erro ao criar preferência de pagamento no Mercado Pago.' }),
+        JSON.stringify({ error: preferenceData.message || 'Erro ao criar preferência de pagamento no Mercado Pago. Verifique seu Access Token.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -125,3 +145,4 @@ serve(async (req) => {
     )
   }
 })
+
