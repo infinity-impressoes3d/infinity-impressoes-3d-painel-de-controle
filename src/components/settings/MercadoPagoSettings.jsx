@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { supabase } from '../../lib/supabaseClient'
+import { supabase, supabaseUrl } from '../../lib/supabaseClient'
 import { 
   CreditCard, 
   Key, 
@@ -46,7 +46,7 @@ export default function MercadoPagoSettings() {
       try {
         const { data: { session } } = await supabase.auth.getSession()
         if (session) {
-          const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/test-mercadopago-connection`, {
+          const res = await fetch(`${supabaseUrl}/functions/v1/test-mercadopago-connection`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${session.access_token}`,
@@ -153,7 +153,7 @@ export default function MercadoPagoSettings() {
       try {
         const { data: { session } } = await supabase.auth.getSession()
         if (session) {
-          const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/save-mercadopago-keys`, {
+          const res = await fetch(`${supabaseUrl}/functions/v1/save-mercadopago-keys`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${session.access_token}`,

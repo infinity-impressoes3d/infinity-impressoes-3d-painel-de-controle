@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { supabase } from '../../lib/supabaseClient'
+import { supabase, supabaseUrl } from '../../lib/supabaseClient'
 import { 
   CreditCard, 
   Key, 
@@ -43,7 +43,7 @@ export default function StripeSettings() {
       try {
         const { data: { session } } = await supabase.auth.getSession()
         if (session) {
-          const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/test-stripe-connection`, {
+          const res = await fetch(`${supabaseUrl}/functions/v1/test-stripe-connection`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${session.access_token}`,
@@ -133,7 +133,7 @@ export default function StripeSettings() {
       try {
         const { data: { session } } = await supabase.auth.getSession()
         if (session) {
-          const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/save-stripe-keys`, {
+          const res = await fetch(`${supabaseUrl}/functions/v1/save-stripe-keys`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${session.access_token}`,
