@@ -17,7 +17,7 @@ import {
 } from 'lucide-react'
 
 export default function InfinitePaySettings() {
-  const [handle, setHandle] = useState('')
+  const [handle, setHandle] = useState('lays-moreira-rodrigues')
   const [apiToken, setApiToken] = useState('')
   const [status, setStatus] = useState({
     checked: false,

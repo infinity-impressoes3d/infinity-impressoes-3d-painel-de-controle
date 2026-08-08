@@ -38,19 +38,16 @@ serve(async (req) => {
       if (!apiToken) apiToken = creds?.access_token
     }
 
+    // Handle padrão oficial se não houver nenhum cadastrado ainda
     if (!handle) {
-      return new Response(
-        JSON.stringify({ 
-          error: 'As configurações da InfinitePay (Handle / InfiniteTag) ainda não foram cadastradas no Painel de Controle.' 
-        }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      handle = 'lays-moreira-rodrigues'
     }
 
     const body = await req.json()
     const { orderId, redirectUrl: clientRedirectUrl, items: clientItems, totalAmount: clientTotal } = body
 
-    const cleanHandle = handle.trim().replace(/^@/, '')
+    // Remove $ e @ se o usuário digitar $lays-moreira-rodrigues ou @lays-moreira-rodrigues
+    const cleanHandle = handle.trim().replace(/^[$@]/, '')
     let totalAmountInCents = 0
     let itemsPayload: Array<{ quantity: number; price: number; description: string }> = []
 
