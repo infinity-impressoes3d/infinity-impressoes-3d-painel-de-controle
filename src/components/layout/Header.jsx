@@ -11,6 +11,7 @@ export default function Header({ activeTab, setActiveTab, isMobileOpen, setIsMob
     orders: 'Gestão de Vendas & Checkouts Abandonados',
     products: 'Gerenciamento de Produtos',
     collections: 'Gerenciamento de Coleções',
+    coupons: 'Gerenciamento de Cupons de Desconto',
     hero: 'Gerenciamento de Banners da Seção Hero',
     integrations: 'Configurações de Integração (InfinitePay)',
   }

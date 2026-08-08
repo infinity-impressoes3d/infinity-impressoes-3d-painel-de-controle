@@ -11,6 +11,7 @@ import ProductModal from './components/products/ProductModal'
 import CollectionList from './components/collections/CollectionList'
 import CollectionModal from './components/collections/CollectionModal'
 import HeroSlideList from './components/hero/HeroSlideList'
+import CouponList from './components/coupons/CouponList'
 import InfinitePaySettings from './components/settings/InfinitePaySettings'
 
 function AdminApp() {
@@ -107,6 +108,8 @@ function AdminApp() {
               onEditCollection={handleOpenEditCollection}
             />
           )}
+
+          {activeTab === 'coupons' && <CouponList />}
 
           {activeTab === 'hero' && <HeroSlideList />}
 

@@ -11,6 +11,7 @@ import {
   ChevronRight,
   ShieldCheck,
   Sparkles,
+  Tag,
   X
 } from 'lucide-react'
 
@@ -21,6 +22,7 @@ export default function Sidebar({ activeTab, setActiveTab, isMobileOpen, setIsMo
     { id: 'orders', label: 'Vendas & Pedidos', icon: ShoppingCart },
     { id: 'products', label: 'Produtos', icon: Package },
     { id: 'collections', label: 'Coleções', icon: FolderTree },
+    { id: 'coupons', label: 'Cupons de Desconto', icon: Tag },
     { id: 'hero', label: 'Slides Seção Hero', icon: Sparkles },
     { id: 'integrations', label: 'InfinitePay (Pagamentos)', icon: CreditCard },
   ]

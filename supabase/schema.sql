@@ -94,6 +94,21 @@ create table if not exists finances (
   updated_at timestamptz default now()
 );
 
+-- 8. Tabela de Cupons de Desconto
+create table if not exists coupons (
+  id uuid primary key default gen_random_uuid(),
+  code text not null unique,
+  type text not null default 'percentage', -- 'percentage', 'fixed', 'free_shipping'
+  value numeric(10,2) not null default 0,
+  min_order_value numeric(10,2) default 0,
+  max_uses integer default null,
+  used_count integer not null default 0,
+  active boolean not null default true,
+  expires_at timestamptz default null,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
 -- ROW LEVEL SECURITY (RLS)
 alter table collections enable row level security;
 alter table products enable row level security;
@@ -102,6 +117,9 @@ alter table hero_slides enable row level security;
 alter table store_settings enable row level security;
 alter table orders enable row level security;
 alter table finances enable row level security;
+alter table coupons enable row level security;
 
+create policy "Permitir acesso total de coupons" on coupons for all using (true) with check (true);
 create policy "admin_all_hero_slides" on hero_slides for all using (auth.role() = 'authenticated');
 create policy "public_read_active_hero_slides" on hero_slides for select using (true);
+
