@@ -76,6 +76,12 @@ export default function OrderList() {
     }
   }
 
+  const isPaidStatus = (status) => {
+    if (!status) return false
+    const s = String(status).trim().toLowerCase()
+    return ['paid', 'shipped', 'approved', 'completed', 'succeeded', 'pago', 'entregue', 'aprovado'].includes(s)
+  }
+
   const handleUpdateStatus = async (orderId, newStatus) => {
     try {
       setOrders(orders.map(o => o.id === orderId ? { ...o, status: newStatus } : o))
@@ -88,6 +94,8 @@ export default function OrderList() {
       if (error) {
         fetchOrders()
         alert('Erro ao atualizar status: ' + error.message)
+      } else {
+        window.dispatchEvent(new Event('orders-updated'))
       }
     } catch (err) {
       fetchOrders()
@@ -105,6 +113,7 @@ export default function OrderList() {
       setOrders(orders.filter(o => o.id !== deleteTarget.id))
       if (selectedOrder?.id === deleteTarget.id) setSelectedOrder(null)
       setDeleteTarget(null)
+      window.dispatchEvent(new Event('orders-updated'))
     } catch (err) {
       alert('Erro ao excluir pedido: ' + err.message)
     } finally {
@@ -124,13 +133,13 @@ export default function OrderList() {
   }
 
   const totalFaturado = orders
-    .filter(o => o.status === 'paid' || o.status === 'shipped')
+    .filter(o => isPaidStatus(o.status))
     .reduce((acc, curr) => acc + Number(curr.total_amount || 0), 0)
 
-  const paidCount = orders.filter(o => o.status === 'paid' || o.status === 'shipped').length
-  const abandonedCount = orders.filter(o => o.status === 'abandoned').length
+  const paidCount = orders.filter(o => isPaidStatus(o.status)).length
+  const abandonedCount = orders.filter(o => String(o.status || '').toLowerCase() === 'abandoned').length
   const abandonedTotal = orders
-    .filter(o => o.status === 'abandoned')
+    .filter(o => String(o.status || '').toLowerCase() === 'abandoned')
     .reduce((acc, curr) => acc + Number(curr.total_amount || 0), 0)
 
   const filteredOrders = orders.filter(order => {
@@ -142,8 +151,8 @@ export default function OrderList() {
 
     const matchesSubTab = 
       activeSubTab === 'all' ||
-      (activeSubTab === 'paid' && (order.status === 'paid' || order.status === 'shipped')) ||
-      (activeSubTab === 'abandoned' && order.status === 'abandoned')
+      (activeSubTab === 'paid' && isPaidStatus(order.status)) ||
+      (activeSubTab === 'abandoned' && String(order.status || '').toLowerCase() === 'abandoned')
 
     return matchesSearch && matchesSubTab
   })

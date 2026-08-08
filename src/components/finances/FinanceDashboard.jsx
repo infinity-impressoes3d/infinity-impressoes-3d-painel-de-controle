@@ -49,6 +49,9 @@ export default function FinanceDashboard() {
   useEffect(() => {
     fetchFinancesAndOrders()
 
+    const handleLocalUpdate = () => fetchFinancesAndOrders()
+    window.addEventListener('orders-updated', handleLocalUpdate)
+
     // Supabase Realtime para escutar novos pedidos e atualizações financeiras
     const channel = supabase
       .channel('finance-orders-realtime')
@@ -57,9 +60,16 @@ export default function FinanceDashboard() {
       .subscribe()
 
     return () => {
+      window.removeEventListener('orders-updated', handleLocalUpdate)
       supabase.removeChannel(channel)
     }
   }, [])
+
+  const isPaidStatus = (status) => {
+    if (!status) return false
+    const s = String(status).trim().toLowerCase()
+    return ['paid', 'shipped', 'approved', 'completed', 'succeeded', 'pago', 'entregue', 'aprovado'].includes(s)
+  }
 
   const fetchFinancesAndOrders = async () => {
     try {
@@ -74,15 +84,16 @@ export default function FinanceDashboard() {
       if (finError) throw finError
       setFinances(finData || [])
 
-      // 2. Busca pedidos pagos ou enviados da loja para integrar como receitas de vendas
+      // 2. Busca pedidos da loja e filtra todos com status de pagamento confirmado
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .select('*')
-        .in('status', ['paid', 'shipped'])
         .order('created_at', { ascending: false })
 
       if (orderError) throw orderError
-      setOrders(orderData || [])
+      
+      const paidOrders = (orderData || []).filter(o => isPaidStatus(o.status))
+      setOrders(paidOrders)
 
     } catch (err) {
       console.error('Erro ao buscar finanças e vendas:', err.message)

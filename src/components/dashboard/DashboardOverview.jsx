@@ -16,7 +16,16 @@ export default function DashboardOverview({ setActiveTab, onOpenProductModal, on
 
   useEffect(() => {
     fetchStats()
+    const handleLocalUpdate = () => fetchStats()
+    window.addEventListener('orders-updated', handleLocalUpdate)
+    return () => window.removeEventListener('orders-updated', handleLocalUpdate)
   }, [])
+
+  const isPaidStatus = (status) => {
+    if (!status) return false
+    const s = String(status).trim().toLowerCase()
+    return ['paid', 'shipped', 'approved', 'completed', 'succeeded', 'pago', 'entregue', 'aprovado'].includes(s)
+  }
 
   const fetchStats = async () => {
     try {
@@ -31,10 +40,10 @@ export default function DashboardOverview({ setActiveTab, onOpenProductModal, on
 
       const { data: orders } = await supabase.from('orders').select('total_amount, status')
       const totalSales = orders
-        ?.filter(o => o.status === 'paid' || o.status === 'shipped')
+        ?.filter(o => isPaidStatus(o.status))
         ?.reduce((acc, curr) => acc + Number(curr.total_amount || 0), 0) || 0
 
-      const abandonedCount = orders?.filter(o => o.status === 'abandoned')?.length || 0
+      const abandonedCount = orders?.filter(o => String(o.status || '').toLowerCase() === 'abandoned')?.length || 0
 
       // Verifica status do Mercado Pago
       let mpConnected = false
