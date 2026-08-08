@@ -12,18 +12,39 @@ serve(async (req) => {
   }
 
   try {
+    const url = new URL(req.url)
+    const secret = url.searchParams.get('secret')
+    const expectedSecret = Deno.env.get('INFINITEPAY_WEBHOOK_SECRET') || 'infinity_3d_secret_token_2026'
+
+    // 1. Validação de Segurança: Rejeita requisições não autorizadas sem a chave secreta
+    if (!secret || secret !== expectedSecret) {
+      return new Response(
+        JSON.stringify({ error: 'Acesso não autorizado: Token do Webhook inválido ou ausente.' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
     const payload = await req.json()
 
-    // Responde 200 OK imediatamente para evitar retentativas desnecessárias
-    const orderId = payload.order_id || payload.metadata?.order_id || payload.nsu
-    const status = payload.status || payload.event || 'paid'
+    // 2. Extrai o ID do pedido e o status do pagamento
+    const orderId = payload.order_nsu || payload.order_id || payload.metadata?.order_id || payload.nsu
+    const status = (payload.status || payload.event || '').toLowerCase()
 
-    if (orderId && (status === 'paid' || status === 'approved' || status === 'COMPLETED' || status === 'PAYMENT_RECEIVED')) {
+    const isPaid = [
+      'paid', 
+      'approved', 
+      'completed', 
+      'payment_received',
+      'pago',
+      'sucesso'
+    ].includes(status)
+
+    // 3. Atualiza o status do pedido no Supabase apenas se confirmado como pago
+    if (orderId && isPaid) {
       await supabase
         .from('orders')
         .update({ 
@@ -34,7 +55,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ received: true }),
+      JSON.stringify({ received: true, success: true }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     )
 
