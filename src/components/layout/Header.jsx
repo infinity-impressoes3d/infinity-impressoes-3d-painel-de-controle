@@ -12,7 +12,7 @@ export default function Header({ activeTab, setActiveTab, isMobileOpen, setIsMob
     products: 'Gerenciamento de Produtos',
     collections: 'Gerenciamento de Coleções',
     hero: 'Gerenciamento de Banners da Seção Hero',
-    integrations: 'Configurações de Integração (Mercado Pago)',
+    integrations: 'Configurações de Integração (InfinitePay)',
   }
 
   return (

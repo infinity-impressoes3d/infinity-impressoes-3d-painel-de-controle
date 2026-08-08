@@ -11,7 +11,7 @@ import ProductModal from './components/products/ProductModal'
 import CollectionList from './components/collections/CollectionList'
 import CollectionModal from './components/collections/CollectionModal'
 import HeroSlideList from './components/hero/HeroSlideList'
-import MercadoPagoSettings from './components/settings/MercadoPagoSettings'
+import InfinitePaySettings from './components/settings/InfinitePaySettings'
 
 function AdminApp() {
   const { user, loading } = useAuth()
@@ -110,7 +110,7 @@ function AdminApp() {
 
           {activeTab === 'hero' && <HeroSlideList />}
 
-          {activeTab === 'integrations' && <MercadoPagoSettings />}
+          {activeTab === 'integrations' && <InfinitePaySettings />}
         </main>
       </div>
 

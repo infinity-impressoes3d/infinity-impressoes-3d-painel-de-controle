@@ -22,7 +22,7 @@ export default function Sidebar({ activeTab, setActiveTab, isMobileOpen, setIsMo
     { id: 'products', label: 'Produtos', icon: Package },
     { id: 'collections', label: 'Coleções', icon: FolderTree },
     { id: 'hero', label: 'Slides Seção Hero', icon: Sparkles },
-    { id: 'integrations', label: 'Integrações (Mercado Pago)', icon: CreditCard },
+    { id: 'integrations', label: 'InfinitePay (Pagamentos)', icon: CreditCard },
   ]
 
   const handleSelectTab = (tabId) => {
