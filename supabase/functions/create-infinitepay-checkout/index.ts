@@ -103,17 +103,9 @@ serve(async (req) => {
     const redirectUrl = clientRedirectUrl || 'https://infinity-impressoes3d.vercel.app/#/sucesso'
     const webhookUrl = `${supabaseUrl}/functions/v1/infinitepay-webhook?secret=${webhookSecret}`
 
-    // Link padrão de fallback direto do Handle
-    let checkoutUrl = `https://pay.infinitepay.io/${cleanHandle}`
-    if (totalAmountInCents > 0) {
-      const params = new URLSearchParams()
-      params.append('amount', totalAmountInCents.toString())
-      if (orderId) params.append('order_id', orderId)
-      if (redirectUrl) params.append('redirect_url', redirectUrl)
-      checkoutUrl = `https://pay.infinitepay.io/${cleanHandle}?${params.toString()}`
-    }
+    let checkoutUrl = ''
 
-    // 3. Tenta criar o link oficial via API da InfinitePay (https://api.checkout.infinitepay.io/links)
+    // 3. Cria o link oficial e bloqueado via API da InfinitePay (https://api.checkout.infinitepay.io/links)
     try {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json'
@@ -139,11 +131,27 @@ serve(async (req) => {
         if (apiData.url || apiData.checkout_url) {
           checkoutUrl = apiData.url || apiData.checkout_url
         }
-      } else {
-        console.log('Tentativa de API retornou status:', apiRes.status, 'Utilizando fallback do Handle.');
       }
     } catch (e) {
-      console.log('Erro ao conectar com API InfinitePay, utilizando link direto:', e);
+      console.log('Erro ao conectar com API InfinitePay:', e);
+    }
+
+    if (!checkoutUrl) {
+      // Se a chamada falhar por qualquer motivo de rede, tenta chamada direta
+      const directRes = await fetch('https://api.checkout.infinitepay.io/links', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          handle: cleanHandle,
+          redirect_url: redirectUrl,
+          order_nsu: orderId || `order_${Date.now()}`,
+          items: itemsPayload
+        })
+      })
+      if (directRes.ok) {
+        const d = await directRes.json()
+        checkoutUrl = d.url || d.checkout_url
+      }
     }
 
     return new Response(
