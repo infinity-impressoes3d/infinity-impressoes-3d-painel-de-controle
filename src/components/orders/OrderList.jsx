@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import ConfirmDeleteModal from '../common/ConfirmDeleteModal'
+import OrderModal from './OrderModal'
 import { 
   ShoppingCart, 
   Search, 
@@ -23,7 +24,9 @@ import {
   Truck,
   CreditCard,
   FileText,
-  ShieldCheck
+  ShieldCheck,
+  Plus,
+  Edit3
 } from 'lucide-react'
 
 export default function OrderList() {
@@ -32,6 +35,10 @@ export default function OrderList() {
   const [search, setSearch] = useState('')
   const [activeSubTab, setActiveSubTab] = useState('all')
   const [selectedOrder, setSelectedOrder] = useState(null)
+
+  // Modal de Criação / Edição Manual de Vendas
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false)
+  const [editingOrderModal, setEditingOrderModal] = useState(null)
 
   // Modal de confirmação de exclusão
   const [deleteTarget, setDeleteTarget] = useState(null)
@@ -150,9 +157,19 @@ export default function OrderList() {
             <ShoppingCart className="w-6 h-6 text-emerald-400" /> Vendas & Checkouts Abandonados
           </h2>
           <p className="text-slate-400 text-xs mt-0.5">
-            Acompanhe dados completos dos clientes (Nome, E-mail, WhatsApp, Endereço e CPF).
+            Acompanhe dados completos dos clientes ou adicione novas vendas manualmente.
           </p>
         </div>
+
+        <button
+          onClick={() => {
+            setEditingOrderModal(null)
+            setIsOrderModalOpen(true)
+          }}
+          className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-1.5 transition-all self-start sm:self-auto"
+        >
+          <Plus className="w-4 h-4" /> Nova Venda Manual (+)
+        </button>
       </div>
 
       {/* Grid de Métricas */}
@@ -385,6 +402,17 @@ export default function OrderList() {
                           </button>
 
                           <button
+                            onClick={() => {
+                              setEditingOrderModal(order)
+                              setIsOrderModalOpen(true)
+                            }}
+                            title="Editar Dados da Venda"
+                            className="p-2 rounded-lg bg-slate-950 border border-slate-800 hover:border-emerald-500 text-slate-300 hover:text-emerald-400 transition-all"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+
+                          <button
                             onClick={() => setDeleteTarget({ id: order.id, name: `Pedido de ${order.customer_name}` })}
                             title="Excluir Registro"
                             className="p-2 rounded-lg bg-slate-950 border border-slate-800 hover:border-rose-500 text-slate-300 hover:text-rose-400 transition-all"
@@ -581,6 +609,14 @@ export default function OrderList() {
         title="Excluir Registro de Pedido"
         message={deleteTarget ? `Tem certeza que deseja excluir o registro do ${deleteTarget.name}?` : ''}
         loading={deleting}
+      />
+
+      {/* Modal de Criação / Edição de Vendas Manuais */}
+      <OrderModal
+        isOpen={isOrderModalOpen}
+        onClose={() => setIsOrderModalOpen(false)}
+        order={editingOrderModal}
+        onSave={fetchOrders}
       />
     </div>
   )

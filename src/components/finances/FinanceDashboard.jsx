@@ -32,6 +32,13 @@ export default function FinanceDashboard() {
   const [typeFilter, setTypeFilter] = useState('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
 
+  // Filtros de Período / Data
+  const [periodFilter, setPeriodFilter] = useState('all') // 'all', 'current_month', 'specific_month', '3_months', '6_months', '1_year'
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  })
+
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState(null)
   
@@ -112,25 +119,42 @@ export default function FinanceDashboard() {
     setIsModalOpen(true)
   }
 
-  // CÁLCULO DE VENDAS AUTOMÁTICAS DA LOJA
-  const totalVendasLoja = orders.reduce((acc, curr) => acc + Number(curr.total_amount || 0), 0)
+  // Função auxiliar para verificar se uma data está dentro do período selecionado
+  const isDateInSelectedPeriod = (itemDate) => {
+    if (!itemDate || isNaN(itemDate.getTime())) return true
+    if (periodFilter === 'all') return true
 
-  // CÁLCULO DE LUCROS MANUAIS
-  const totalLucrosManuais = finances
-    .filter(f => f.type === 'income')
-    .reduce((acc, curr) => acc + Number(curr.amount || 0), 0)
+    const now = new Date()
 
-  // RECEITA TOTAL (Vendas da Loja + Lucros Manuais)
-  const totalReceitas = totalVendasLoja + totalLucrosManuais
+    if (periodFilter === 'current_month') {
+      return itemDate.getFullYear() === now.getFullYear() && itemDate.getMonth() === now.getMonth()
+    }
 
-  // CUSTOS TOTAIS
-  const totalCustos = finances
-    .filter(f => f.type === 'expense')
-    .reduce((acc, curr) => acc + Number(curr.amount || 0), 0)
+    if (periodFilter === 'specific_month') {
+      if (!selectedMonth) return true
+      const [yearStr, monthStr] = selectedMonth.split('-')
+      const targetYear = parseInt(yearStr, 10)
+      const targetMonth = parseInt(monthStr, 10) - 1
+      return itemDate.getFullYear() === targetYear && itemDate.getMonth() === targetMonth
+    }
 
-  // SALDO LÍQUIDO & MARGEM DE LUCRO
-  const saldoLiquido = totalReceitas - totalCustos
-  const margemLucro = totalReceitas > 0 ? ((saldoLiquido / totalReceitas) * 100).toFixed(1) : '0.0'
+    if (periodFilter === '3_months') {
+      const target = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate())
+      return itemDate >= target
+    }
+
+    if (periodFilter === '6_months') {
+      const target = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate())
+      return itemDate >= target
+    }
+
+    if (periodFilter === '1_year') {
+      const target = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate())
+      return itemDate >= target
+    }
+
+    return true
+  }
 
   // Combina pedidos pagos da loja + lançamentos manuais de finanças em uma lista unificada
   const formattedOrderItems = orders.map(o => ({
@@ -151,7 +175,27 @@ export default function FinanceDashboard() {
     rawDate: new Date(f.date + 'T00:00:00')
   }))
 
-  const allTransactions = [...formattedOrderItems, ...formattedFinanceItems].sort((a, b) => b.rawDate - a.rawDate)
+  // Filtra itens pelo período escolhido pelo usuário
+  const periodFilteredOrders = formattedOrderItems.filter(o => isDateInSelectedPeriod(o.rawDate))
+  const periodFilteredFinances = formattedFinanceItems.filter(f => isDateInSelectedPeriod(f.rawDate))
+
+  // CÁLCULOS DAS MÉTRICAS DO PERÍODO
+  const totalVendasLoja = periodFilteredOrders.reduce((acc, curr) => acc + Number(curr.amount || 0), 0)
+
+  const totalLucrosManuais = periodFilteredFinances
+    .filter(f => f.type === 'income')
+    .reduce((acc, curr) => acc + Number(curr.amount || 0), 0)
+
+  const totalReceitas = totalVendasLoja + totalLucrosManuais
+
+  const totalCustos = periodFilteredFinances
+    .filter(f => f.type === 'expense')
+    .reduce((acc, curr) => acc + Number(curr.amount || 0), 0)
+
+  const saldoLiquido = totalReceitas - totalCustos
+  const margemLucro = totalReceitas > 0 ? ((saldoLiquido / totalReceitas) * 100).toFixed(1) : '0.0'
+
+  const allTransactions = [...periodFilteredOrders, ...periodFilteredFinances].sort((a, b) => b.rawDate - a.rawDate)
 
   const categories = Array.from(new Set(allTransactions.map(f => f.category).filter(Boolean)))
 
@@ -177,10 +221,10 @@ export default function FinanceDashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-            <TrendingUp className="w-6 h-6 text-emerald-400" /> Gestão Financeira Integração com Vendas
+            <TrendingUp className="w-6 h-6 text-emerald-400" /> Gestão Financeira & Lucros
           </h2>
           <p className="text-slate-400 text-xs mt-0.5">
-            As vendas pagas da loja são somadas automaticamente ao faturamento. Adicione custos de filamentos e energia para calcular o lucro líquido real.
+            Acompanhe o faturamento com vendas e despesas. Filtre os lucros por mês ou período.
           </p>
         </div>
 
@@ -197,6 +241,94 @@ export default function FinanceDashboard() {
           >
             <Plus className="w-4 h-4" /> Novo Custo (-)
           </button>
+        </div>
+      </div>
+
+      {/* Bar de Filtro por Período / Mês */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
+          <Calendar className="w-4 h-4 text-emerald-400" />
+          <span>Filtrar Lucros por Período:</span>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          <button
+            onClick={() => setPeriodFilter('all')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+              periodFilter === 'all'
+                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+                : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+            }`}
+          >
+            Todo o Período
+          </button>
+
+          <button
+            onClick={() => setPeriodFilter('current_month')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+              periodFilter === 'current_month'
+                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+                : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+            }`}
+          >
+            Mês Atual
+          </button>
+
+          <button
+            onClick={() => setPeriodFilter('3_months')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+              periodFilter === '3_months'
+                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+                : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+            }`}
+          >
+            Últimos 3 Meses
+          </button>
+
+          <button
+            onClick={() => setPeriodFilter('6_months')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+              periodFilter === '6_months'
+                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+                : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+            }`}
+          >
+            Últimos 6 Meses
+          </button>
+
+          <button
+            onClick={() => setPeriodFilter('1_year')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+              periodFilter === '1_year'
+                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+                : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+            }`}
+          >
+            1 Ano
+          </button>
+
+          {/* Seletor de Mês Específico */}
+          <div className="flex items-center gap-1.5 pl-2 border-l border-slate-800">
+            <button
+              onClick={() => setPeriodFilter('specific_month')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                periodFilter === 'specific_month'
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+                  : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+              }`}
+            >
+              Mês Específico:
+            </button>
+            <input
+              type="month"
+              value={selectedMonth}
+              onChange={(e) => {
+                setSelectedMonth(e.target.value)
+                setPeriodFilter('specific_month')
+              }}
+              className="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1 text-xs text-white focus:outline-none focus:border-indigo-500"
+            />
+          </div>
         </div>
       </div>
 
