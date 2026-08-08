@@ -106,6 +106,7 @@ serve(async (req) => {
     let checkoutUrl = ''
 
     // 3. Cria o link oficial e bloqueado via API da InfinitePay (https://api.checkout.infinitepay.io/links)
+    const { customer: clientCustomer, address: clientAddress } = body
     try {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json'
@@ -114,16 +115,20 @@ serve(async (req) => {
         headers['Authorization'] = `Bearer ${apiToken}`
       }
 
+      const apiPayload: any = {
+        handle: cleanHandle,
+        redirect_url: redirectUrl,
+        webhook_url: webhookUrl,
+        order_nsu: orderId || `order_${Date.now()}`,
+        items: itemsPayload
+      }
+      if (clientCustomer) apiPayload.customer = clientCustomer
+      if (clientAddress) apiPayload.address = clientAddress
+
       const apiRes = await fetch('https://api.checkout.infinitepay.io/links', {
         method: 'POST',
         headers: headers,
-        body: JSON.stringify({
-          handle: cleanHandle,
-          redirect_url: redirectUrl,
-          webhook_url: webhookUrl,
-          order_nsu: orderId || `order_${Date.now()}`,
-          items: itemsPayload
-        })
+        body: JSON.stringify(apiPayload)
       })
 
       if (apiRes.ok) {
@@ -138,15 +143,19 @@ serve(async (req) => {
 
     if (!checkoutUrl) {
       // Se a chamada falhar por qualquer motivo de rede, tenta chamada direta
+      const directPayload: any = {
+        handle: cleanHandle,
+        redirect_url: redirectUrl,
+        order_nsu: orderId || `order_${Date.now()}`,
+        items: itemsPayload
+      }
+      if (clientCustomer) directPayload.customer = clientCustomer
+      if (clientAddress) directPayload.address = clientAddress
+
       const directRes = await fetch('https://api.checkout.infinitepay.io/links', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          handle: cleanHandle,
-          redirect_url: redirectUrl,
-          order_nsu: orderId || `order_${Date.now()}`,
-          items: itemsPayload
-        })
+        body: JSON.stringify(directPayload)
       })
       if (directRes.ok) {
         const d = await directRes.json()
