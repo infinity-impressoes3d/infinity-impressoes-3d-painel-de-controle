@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabaseClient'
-import { X, Upload, Trash2, Plus, Tag, Weight, DollarSign, Image as ImageIcon, AlertCircle, Heading1, Heading2, Bold, Italic, List, Link } from 'lucide-react'
+import { X, Upload, Trash2, Plus, Tag, Weight, DollarSign, Image as ImageIcon, AlertCircle, Heading1, Heading2, Bold, Italic, List, Link, Truck } from 'lucide-react'
 
 export default function ProductModal({ isOpen, onClose, product, onSave }) {
   const [name, setName] = useState('')
@@ -11,6 +11,7 @@ export default function ProductModal({ isOpen, onClose, product, onSave }) {
   const [sizesInput, setSizesInput] = useState('')
   const [collectionId, setCollectionId] = useState('')
   const [active, setActive] = useState(true)
+  const [isFreeShipping, setIsFreeShipping] = useState(false)
   const [images, setImages] = useState([])
   const [imageUrlInput, setImageUrlInput] = useState('')
 
@@ -34,6 +35,7 @@ export default function ProductModal({ isOpen, onClose, product, onSave }) {
         setSizesInput(product.sizes ? product.sizes.join(', ') : '')
         setCollectionId(product.collection_id || '')
         setActive(product.active !== undefined ? product.active : true)
+        setIsFreeShipping(Boolean(product.is_free_shipping || product.free_shipping))
         setImages(product.images || [])
       } else {
         // Reset formulário para novo produto
@@ -45,6 +47,7 @@ export default function ProductModal({ isOpen, onClose, product, onSave }) {
         setSizesInput('')
         setCollectionId('')
         setActive(true)
+        setIsFreeShipping(false)
         setImages([])
       }
       setImageUrlInput('')
@@ -202,6 +205,8 @@ export default function ProductModal({ isOpen, onClose, product, onSave }) {
         sizes: sizesArray,
         collection_id: collectionId || null,
         active,
+        is_free_shipping: isFreeShipping,
+        free_shipping: isFreeShipping,
         images,
         updated_at: new Date().toISOString(),
       }
@@ -527,18 +532,34 @@ export default function ProductModal({ isOpen, onClose, product, onSave }) {
             </div>
           </div>
 
-          {/* Checkbox Ativo */}
-          <div className="flex items-center gap-3 pt-2 border-t border-slate-800/80">
-            <input
-              type="checkbox"
-              id="activeCheckbox"
-              checked={active}
-              onChange={(e) => setActive(e.target.checked)}
-              className="w-4 h-4 rounded bg-slate-950 border-slate-800 text-indigo-600 focus:ring-indigo-500"
-            />
-            <label htmlFor="activeCheckbox" className="text-sm font-medium text-slate-200 cursor-pointer">
-              Produto Ativo (Visível na loja e vitrine)
-            </label>
+          {/* Checkbox Frete Grátis & Ativo */}
+          <div className="space-y-3 pt-2 border-t border-slate-800/80">
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="freeShippingCheckbox"
+                checked={isFreeShipping}
+                onChange={(e) => setIsFreeShipping(e.target.checked)}
+                className="w-4 h-4 rounded bg-slate-950 border-slate-800 text-emerald-500 focus:ring-emerald-500 cursor-pointer"
+              />
+              <label htmlFor="freeShippingCheckbox" className="text-sm font-semibold text-emerald-400 cursor-pointer flex items-center gap-2">
+                <Truck className="w-4 h-4 text-emerald-400" />
+                <span>Oferecer Frete Grátis para este produto</span>
+              </label>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="activeCheckbox"
+                checked={active}
+                onChange={(e) => setActive(e.target.checked)}
+                className="w-4 h-4 rounded bg-slate-950 border-slate-800 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+              />
+              <label htmlFor="activeCheckbox" className="text-sm font-medium text-slate-200 cursor-pointer">
+                Produto Ativo (Visível na loja e vitrine)
+              </label>
+            </div>
           </div>
 
           {/* Botões do Modal */}

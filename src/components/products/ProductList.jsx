@@ -14,7 +14,8 @@ import {
   Weight,
   Tag,
   CheckCircle,
-  XCircle
+  XCircle,
+  Truck
 } from 'lucide-react'
 
 export default function ProductList({ onEditProduct, onCreateProduct }) {
@@ -265,6 +266,12 @@ export default function ProductList({ onEditProduct, onCreateProduct }) {
                       </td>
 
                       <td className="py-3.5 px-4 text-xs space-y-1">
+                        {(product.is_free_shipping || product.free_shipping) && (
+                          <div className="flex items-center gap-1.5 text-emerald-400 font-semibold">
+                            <Truck className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>Frete Grátis</span>
+                          </div>
+                        )}
                         <div className="flex items-center gap-1.5 text-slate-400">
                           <Weight className="w-3.5 h-3.5 text-slate-500" />
                           <span>{product.weight_grams ? `${product.weight_grams}g` : 'Peso nulo (não exibe)'}</span>
