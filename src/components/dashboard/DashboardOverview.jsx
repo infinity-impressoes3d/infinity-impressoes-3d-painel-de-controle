@@ -24,7 +24,22 @@ export default function DashboardOverview({ setActiveTab, onOpenProductModal, on
   const isPaidStatus = (status) => {
     if (!status) return false
     const s = String(status).trim().toLowerCase()
-    return ['paid', 'shipped', 'approved', 'completed', 'succeeded', 'pago', 'entregue', 'aprovado'].includes(s)
+    return [
+      'paid', 
+      'shipped', 
+      'approved', 
+      'completed', 
+      'succeeded', 
+      'pago', 
+      'entregue', 
+      'aprovado',
+      'pedido_concluido',
+      'pedido concluído',
+      'pedido concluido',
+      'concluido',
+      'concluído',
+      'finalizado'
+    ].includes(s)
   }
 
   const fetchStats = async () => {
