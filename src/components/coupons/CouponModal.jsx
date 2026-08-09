@@ -61,33 +61,51 @@ export default function CouponModal({ isOpen, onClose, coupon, onSave }) {
     e.preventDefault()
     setError(null)
 
-    const cleanCode = code.trim().toUpperCase()
+    const cleanCode = code.trim().toUpperCase().replace(/\s+/g, '')
     if (!cleanCode) {
-      setError('Informe o código do cupom (ex: PROMO10, FRETEGRATIS).')
+      setError('Informe o código do cupom (ex: PROMO10, FRETEGRATIS, INFINITY50).')
       return
     }
 
-    let numValue = parseFloat(value) || 0
-    if (type !== 'free_shipping' && numValue <= 0) {
-      setError('Informe um valor de desconto válido maior que zero.')
-      return
+    let numValue = 0
+    if (type !== 'free_shipping') {
+      const cleanVal = String(value).replace(',', '.').replace('%', '').trim()
+      numValue = parseFloat(cleanVal)
+      
+      if (isNaN(numValue) || numValue <= 0) {
+        setError(type === 'percentage' 
+          ? 'Informe uma porcentagem válida maior que zero (ex: 10, 20, 50).' 
+          : 'Informe um valor em reais válido maior que zero (ex: 10.00, 25.50).'
+        )
+        return
+      }
+
+      if (type === 'percentage' && numValue > 100) {
+        setError('A porcentagem de desconto não pode ser maior que 100%.')
+        return
+      }
     }
 
-    if (type === 'percentage' && numValue > 100) {
-      setError('A porcentagem de desconto não pode ser maior que 100%.')
-      return
+    let parsedMin = 0
+    if (minOrderValue) {
+      const cleanMin = String(minOrderValue).replace(',', '.').trim()
+      const parsed = parseFloat(cleanMin)
+      if (!isNaN(parsed) && parsed > 0) parsedMin = parsed
     }
 
-    if (type === 'free_shipping') {
-      numValue = 0
+    let parsedMaxUses = null
+    if (maxUses) {
+      const cleanMax = String(maxUses).replace(/\D/g, '').trim()
+      const parsed = parseInt(cleanMax, 10)
+      if (!isNaN(parsed) && parsed > 0) parsedMaxUses = parsed
     }
 
     const payload = {
       code: cleanCode,
       type: type,
       value: numValue,
-      min_order_value: minOrderValue ? parseFloat(minOrderValue) : 0,
-      max_uses: maxUses ? parseInt(maxUses, 10) : null,
+      min_order_value: parsedMin,
+      max_uses: parsedMaxUses,
       expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
       active: active,
       updated_at: new Date().toISOString()
@@ -156,7 +174,7 @@ export default function CouponModal({ isOpen, onClose, coupon, onSave }) {
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-5 md:p-6 space-y-5 overflow-y-auto flex-1 custom-scrollbar">
+        <form noValidate onSubmit={handleSubmit} className="p-5 md:p-6 space-y-5 overflow-y-auto flex-1 custom-scrollbar">
           {error && (
             <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-xl text-xs text-rose-400 flex items-center gap-2.5">
               <AlertCircle className="w-4 h-4 shrink-0" />
@@ -172,7 +190,6 @@ export default function CouponModal({ isOpen, onClose, coupon, onSave }) {
             <div className="relative">
               <input
                 type="text"
-                required
                 value={code}
                 onChange={handleCodeChange}
                 placeholder="Ex: INFINITY50, PROMO10, FRETEGRATIS"
@@ -195,7 +212,7 @@ export default function CouponModal({ isOpen, onClose, coupon, onSave }) {
             <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
-                onClick={() => setType('percentage')}
+                onClick={() => { setType('percentage'); setError(null); }}
                 className={`flex flex-col items-center justify-center p-3 rounded-xl border text-xs font-medium transition-all ${
                   type === 'percentage'
                     ? 'bg-indigo-600/15 border-indigo-500 text-indigo-400 shadow-sm'
@@ -208,7 +225,7 @@ export default function CouponModal({ isOpen, onClose, coupon, onSave }) {
 
               <button
                 type="button"
-                onClick={() => setType('fixed')}
+                onClick={() => { setType('fixed'); setError(null); }}
                 className={`flex flex-col items-center justify-center p-3 rounded-xl border text-xs font-medium transition-all ${
                   type === 'fixed'
                     ? 'bg-emerald-600/15 border-emerald-500 text-emerald-400 shadow-sm'
@@ -221,7 +238,7 @@ export default function CouponModal({ isOpen, onClose, coupon, onSave }) {
 
               <button
                 type="button"
-                onClick={() => setType('free_shipping')}
+                onClick={() => { setType('free_shipping'); setError(null); }}
                 className={`flex flex-col items-center justify-center p-3 rounded-xl border text-xs font-medium transition-all ${
                   type === 'free_shipping'
                     ? 'bg-amber-600/15 border-amber-500 text-amber-400 shadow-sm'
@@ -242,20 +259,20 @@ export default function CouponModal({ isOpen, onClose, coupon, onSave }) {
               </label>
               <div className="relative">
                 <input
-                  type="number"
-                  step={type === 'percentage' ? '1' : '0.01'}
-                  min="0.01"
-                  max={type === 'percentage' ? '100' : undefined}
-                  required
+                  type="text"
+                  inputMode="decimal"
                   value={value}
-                  onChange={(e) => setValue(e.target.value)}
-                  placeholder={type === 'percentage' ? 'Ex: 50 (para 50% OFF)' : 'Ex: 10.00 (para R$ 10 OFF)'}
+                  onChange={(e) => { setValue(e.target.value); setError(null); }}
+                  placeholder={type === 'percentage' ? 'Ex: 10, 20, 50 (para 50% OFF)' : 'Ex: 10.00 ou 10,00 (para R$ 10 OFF)'}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 placeholder:text-slate-600 transition-all font-semibold"
                 />
                 <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-sm text-slate-400 font-bold">
                   {type === 'percentage' ? '%' : 'R$'}
                 </div>
               </div>
+              <p className="text-[11px] text-slate-500 mt-1">
+                {type === 'percentage' ? 'Digite apenas o número da porcentagem (ex: 10 para 10% de desconto).' : 'Digite o valor em reais (ex: 15.00 ou 15).' }
+              </p>
             </div>
           )}
 
@@ -267,9 +284,8 @@ export default function CouponModal({ isOpen, onClose, coupon, onSave }) {
               </label>
               <div className="relative">
                 <input
-                  type="number"
-                  step="0.01"
-                  min="0"
+                  type="text"
+                  inputMode="decimal"
                   value={minOrderValue}
                   onChange={(e) => setMinOrderValue(e.target.value)}
                   placeholder="0.00 (Sem mínimo)"
@@ -288,10 +304,10 @@ export default function CouponModal({ isOpen, onClose, coupon, onSave }) {
               </label>
               <div className="relative">
                 <input
-                  type="number"
-                  min="1"
+                  type="text"
+                  inputMode="numeric"
                   value={maxUses}
-                  onChange={(e) => setMaxUses(e.target.value)}
+                  onChange={(e) => setMaxUses(e.target.value.replace(/\D/g, ''))}
                   placeholder="Ilimitado"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 placeholder:text-slate-600 transition-all"
                 />
