@@ -212,13 +212,13 @@ export default function ProductModal({ isOpen, onClose, product, onSave }) {
 
       let savedProductId = product ? product.id : null
 
+      let saveError = null
       if (product) {
         const { error: updateError } = await supabase
           .from('products')
           .update(payload)
           .eq('id', product.id)
-
-        if (updateError) throw updateError
+        saveError = updateError
       } else {
         const newId = 'prod-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7)
         payload.id = newId
@@ -227,9 +227,33 @@ export default function ProductModal({ isOpen, onClose, product, onSave }) {
         const { error: insertError } = await supabase
           .from('products')
           .insert([payload])
-
-        if (insertError) throw insertError
+        saveError = insertError
       }
+
+      // Se uma coluna (ex: is_free_shipping) ainda não existir na tabela do Supabase remoto, tenta salvar sem a coluna
+      if (saveError && saveError.message && saveError.message.includes('schema cache')) {
+        const match = saveError.message.match(/Could not find the '([^']+)' column/)
+        const missingCol = match && match[1] ? match[1] : 'is_free_shipping'
+        if (Object.prototype.hasOwnProperty.call(payload, missingCol)) {
+          const fallbackPayload = { ...payload }
+          delete fallbackPayload[missingCol]
+
+          if (product) {
+            const { error: retryUpdateError } = await supabase
+              .from('products')
+              .update(fallbackPayload)
+              .eq('id', product.id)
+            saveError = retryUpdateError
+          } else {
+            const { error: retryInsertError } = await supabase
+              .from('products')
+              .insert([fallbackPayload])
+            saveError = retryInsertError
+          }
+        }
+      }
+
+      if (saveError) throw saveError
 
       // Sincroniza relação na tabela product_collections se houver coleção
       if (savedProductId && collectionId) {
