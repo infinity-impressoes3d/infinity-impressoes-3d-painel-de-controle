@@ -206,7 +206,6 @@ export default function ProductModal({ isOpen, onClose, product, onSave }) {
         collection_id: collectionId || null,
         active,
         is_free_shipping: isFreeShipping,
-        free_shipping: isFreeShipping,
         images,
         updated_at: new Date().toISOString(),
       }
