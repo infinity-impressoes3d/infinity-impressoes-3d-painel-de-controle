@@ -120,6 +120,13 @@ alter table finances enable row level security;
 alter table coupons enable row level security;
 
 create policy "Permitir acesso total de coupons" on coupons for all using (true) with check (true);
+create policy "Permitir acesso total de orders" on orders for all using (true) with check (true);
+create policy "Permitir acesso total de finances" on finances for all using (true) with check (true);
+create policy "Permitir acesso total de collections" on collections for all using (true) with check (true);
+create policy "Permitir acesso total de products" on products for all using (true) with check (true);
+create policy "Permitir acesso total de product_collections" on product_collections for all using (true) with check (true);
+create policy "Permitir acesso total de store_settings" on store_settings for all using (true) with check (true);
 create policy "admin_all_hero_slides" on hero_slides for all using (auth.role() = 'authenticated');
 create policy "public_read_active_hero_slides" on hero_slides for select using (true);
+
 

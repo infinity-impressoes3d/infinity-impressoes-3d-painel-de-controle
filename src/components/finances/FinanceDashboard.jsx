@@ -68,50 +68,72 @@ export default function FinanceDashboard() {
   const isPaidStatus = (status) => {
     if (!status) return false
     const s = String(status).trim().toLowerCase()
-    return [
-      'paid', 
-      'shipped', 
-      'approved', 
-      'completed', 
-      'succeeded', 
-      'pago', 
-      'entregue', 
-      'aprovado',
-      'pedido_concluido',
-      'pedido concluído',
-      'pedido concluido',
-      'concluido',
-      'concluído',
-      'finalizado'
-    ].includes(s)
+    return (
+      s === 'paid' || 
+      s === 'shipped' || 
+      s === 'approved' || 
+      s === 'completed' || 
+      s === 'succeeded' || 
+      s === 'pago' || 
+      s === 'entregue' || 
+      s === 'aprovado' ||
+      s === 'pedido_concluido' ||
+      s === 'pedido concluído' ||
+      s === 'pedido concluido' ||
+      s === 'concluido' ||
+      s === 'concluído' ||
+      s === 'finalizado' ||
+      s.includes('pago') ||
+      s.includes('paid') ||
+      s.includes('aprovad') ||
+      s.includes('conclu')
+    )
+  }
+
+  const parseDateSafe = (dateVal) => {
+    if (!dateVal) return new Date()
+    if (typeof dateVal === 'string' && dateVal.length === 10 && dateVal.includes('-')) {
+      const [y, m, d] = dateVal.split('-').map(Number)
+      return new Date(y, m - 1, d)
+    }
+    const d = new Date(dateVal)
+    return isNaN(d.getTime()) ? new Date() : d
   }
 
   const fetchFinancesAndOrders = async () => {
     try {
       setLoading(true)
       
-      // 1. Busca lançamentos da tabela de finanças
-      const { data: finData, error: finError } = await supabase
-        .from('finances')
-        .select('*')
-        .order('date', { ascending: false })
+      // 1. Busca lançamentos da tabela de finanças de forma independente
+      let finData = []
+      try {
+        const { data, error } = await supabase
+          .from('finances')
+          .select('*')
+          .order('date', { ascending: false })
+        if (!error && data) finData = data
+      } catch (err) {
+        console.warn('Aviso finanças:', err)
+      }
+      setFinances(finData)
 
-      if (finError) throw finError
-      setFinances(finData || [])
-
-      // 2. Busca pedidos da loja e filtra todos com status de pagamento confirmado
-      const { data: orderData, error: orderError } = await supabase
-        .from('orders')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (orderError) throw orderError
+      // 2. Busca pedidos da loja de forma independente e filtra TODOS os pagos
+      let orderData = []
+      try {
+        const { data, error } = await supabase
+          .from('orders')
+          .select('*')
+          .order('created_at', { ascending: false })
+        if (!error && data) orderData = data
+      } catch (err) {
+        console.warn('Aviso pedidos:', err)
+      }
       
       const paidOrders = (orderData || []).filter(o => isPaidStatus(o.status))
       setOrders(paidOrders)
 
     } catch (err) {
-      console.error('Erro ao buscar finanças e vendas:', err.message)
+      console.error('Erro ao sincronizar finanças e vendas:', err.message)
     } finally {
       setLoading(false)
     }
@@ -183,23 +205,30 @@ export default function FinanceDashboard() {
   }
 
   // Combina pedidos pagos da loja + lançamentos manuais de finanças em uma lista unificada
-  const formattedOrderItems = orders.map(o => ({
-    id: `order-${o.id}`,
-    isOrder: true,
-    title: `Venda Loja: Pedido de ${o.customer_name}`,
-    description: `Itens: ${Array.isArray(o.items) ? o.items.map(i => `${i.name} (x${i.quantity || 1})`).join(', ') : 'Produto 3D'} | Pagamento: ${o.payment_method ? o.payment_method.toUpperCase() : 'PIX/Cartão'}`,
-    category: 'Vendas Loja',
-    amount: Number(o.total_amount || 0),
-    type: 'income',
-    date: o.created_at ? o.created_at.slice(0, 10) : new Date().toISOString().slice(0, 10),
-    rawDate: new Date(o.created_at || Date.now())
-  }))
+  const formattedOrderItems = orders.map(o => {
+    const rawDate = parseDateSafe(o.created_at || o.date)
+    return {
+      id: `order-${o.id}`,
+      isOrder: true,
+      orderData: o,
+      title: `Venda Loja: Pedido de ${o.customer_name || 'Cliente'}`,
+      description: `Itens: ${Array.isArray(o.items) ? o.items.map(i => `${i.name || i.title || 'Produto'} (x${i.quantity || 1})`).join(', ') : (typeof o.items === 'string' ? o.items : 'Produto 3D')} | Pagamento: ${o.payment_method ? o.payment_method.toUpperCase() : 'PIX/Cartão'}`,
+      category: 'Vendas Loja',
+      amount: Number(o.total_amount || 0),
+      type: 'income',
+      date: rawDate.toISOString().slice(0, 10),
+      rawDate: rawDate
+    }
+  })
 
-  const formattedFinanceItems = finances.map(f => ({
-    ...f,
-    isOrder: false,
-    rawDate: new Date(f.date + 'T00:00:00')
-  }))
+  const formattedFinanceItems = finances.map(f => {
+    const rawDate = parseDateSafe(f.date || f.created_at)
+    return {
+      ...f,
+      isOrder: false,
+      rawDate: rawDate
+    }
+  })
 
   // Filtra itens pelo período escolhido pelo usuário
   const periodFilteredOrders = formattedOrderItems.filter(o => isDateInSelectedPeriod(o.rawDate))
