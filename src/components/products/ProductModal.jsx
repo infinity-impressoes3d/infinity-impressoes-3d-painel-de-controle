@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabaseClient'
-import { X, Upload, Trash2, Plus, Tag, Weight, DollarSign, Image as ImageIcon, AlertCircle, Heading1, Heading2, Bold, Italic, List, Link, Truck } from 'lucide-react'
+import { X, Upload, Trash2, Plus, Tag, Weight, DollarSign, Image as ImageIcon, AlertCircle, Heading1, Heading2, Bold, Italic, List, Link, Truck, Pin } from 'lucide-react'
 
 export default function ProductModal({ isOpen, onClose, product, onSave }) {
   const [name, setName] = useState('')
@@ -12,6 +12,7 @@ export default function ProductModal({ isOpen, onClose, product, onSave }) {
   const [collectionId, setCollectionId] = useState('')
   const [active, setActive] = useState(true)
   const [isFreeShipping, setIsFreeShipping] = useState(false)
+  const [isPinned, setIsPinned] = useState(false)
   const [images, setImages] = useState([])
   const [imageUrlInput, setImageUrlInput] = useState('')
 
@@ -36,6 +37,7 @@ export default function ProductModal({ isOpen, onClose, product, onSave }) {
         setCollectionId(product.collection_id || '')
         setActive(product.active !== undefined ? product.active : true)
         setIsFreeShipping(Boolean(product.is_free_shipping || product.free_shipping))
+        setIsPinned(Boolean(product.is_pinned || product.isPinned))
         setImages(product.images || [])
       } else {
         // Reset formulário para novo produto
@@ -48,6 +50,7 @@ export default function ProductModal({ isOpen, onClose, product, onSave }) {
         setCollectionId('')
         setActive(true)
         setIsFreeShipping(false)
+        setIsPinned(false)
         setImages([])
       }
       setImageUrlInput('')
@@ -206,6 +209,7 @@ export default function ProductModal({ isOpen, onClose, product, onSave }) {
         collection_id: collectionId || null,
         active,
         is_free_shipping: isFreeShipping,
+        is_pinned: isPinned,
         images,
         updated_at: new Date().toISOString(),
       }
@@ -555,8 +559,22 @@ export default function ProductModal({ isOpen, onClose, product, onSave }) {
             </div>
           </div>
 
-          {/* Checkbox Frete Grátis & Ativo */}
+          {/* Checkbox Frete Grátis, Fixar no Topo & Ativo */}
           <div className="space-y-3 pt-2 border-t border-slate-800/80">
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="pinnedCheckbox"
+                checked={isPinned}
+                onChange={(e) => setIsPinned(e.target.checked)}
+                className="w-4 h-4 rounded bg-slate-950 border-slate-800 text-amber-500 focus:ring-amber-500 cursor-pointer"
+              />
+              <label htmlFor="pinnedCheckbox" className="text-sm font-semibold text-amber-400 cursor-pointer flex items-center gap-2">
+                <Pin className="w-4 h-4 text-amber-400 fill-amber-400/20" />
+                <span>Fixar produto no topo da loja (Exibir em primeiro)</span>
+              </label>
+            </div>
+
             <div className="flex items-center gap-3">
               <input
                 type="checkbox"

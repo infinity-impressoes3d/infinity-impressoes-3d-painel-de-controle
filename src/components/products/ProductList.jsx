@@ -15,7 +15,8 @@ import {
   Tag,
   CheckCircle,
   XCircle,
-  Truck
+  Truck,
+  Pin
 } from 'lucide-react'
 
 export default function ProductList({ onEditProduct, onCreateProduct }) {
@@ -74,6 +75,9 @@ export default function ProductList({ onEditProduct, onCreateProduct }) {
         collections: p.collection_id && collectionsMap[p.collection_id] ? { id: p.collection_id, name: collectionsMap[p.collection_id] } : null
       }))
 
+      // Ordena produtos fixados primeiro
+      formattedProds.sort((a, b) => (Boolean(b.is_pinned || b.isPinned) ? 1 : 0) - (Boolean(a.is_pinned || a.isPinned) ? 1 : 0))
+
       setProducts(formattedProds)
     } catch (err) {
       console.error('Erro ao buscar produtos:', err.message)
@@ -95,6 +99,28 @@ export default function ProductList({ onEditProduct, onCreateProduct }) {
       if (error) {
         fetchData()
         alert('Erro ao alterar status do produto: ' + error.message)
+      }
+    } catch (err) {
+      fetchData()
+    }
+  }
+
+  const handleTogglePinned = async (product) => {
+    try {
+      const updatedPinned = !Boolean(product.is_pinned || product.isPinned)
+      setProducts(prev => {
+        const updated = prev.map(p => p.id === product.id ? { ...p, is_pinned: updatedPinned } : p)
+        return updated.sort((a, b) => (Boolean(b.is_pinned || b.isPinned) ? 1 : 0) - (Boolean(a.is_pinned || a.isPinned) ? 1 : 0))
+      })
+
+      const { error } = await supabase
+        .from('products')
+        .update({ is_pinned: updatedPinned, updated_at: new Date().toISOString() })
+        .eq('id', product.id)
+
+      if (error) {
+        fetchData()
+        alert('Erro ao alterar fixação do produto: ' + error.message)
       }
     } catch (err) {
       fetchData()
@@ -266,6 +292,12 @@ export default function ProductList({ onEditProduct, onCreateProduct }) {
                       </td>
 
                       <td className="py-3.5 px-4 text-xs space-y-1">
+                        {(product.is_pinned || product.isPinned) && (
+                          <div className="flex items-center gap-1.5 text-amber-400 font-semibold">
+                            <Pin className="w-3.5 h-3.5 text-amber-400 fill-amber-400/20" />
+                            <span>Fixado no Topo</span>
+                          </div>
+                        )}
                         {(product.is_free_shipping || product.free_shipping) && (
                           <div className="flex items-center gap-1.5 text-emerald-400 font-semibold">
                             <Truck className="w-3.5 h-3.5 text-emerald-400" />
@@ -309,6 +341,17 @@ export default function ProductList({ onEditProduct, onCreateProduct }) {
 
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => handleTogglePinned(product)}
+                            title={product.is_pinned || product.isPinned ? "Desfixar do Topo" : "Fixar no Topo da Loja"}
+                            className={`p-2 rounded-lg bg-slate-950 border transition-all ${
+                              product.is_pinned || product.isPinned
+                                ? 'border-amber-500/50 text-amber-400 hover:bg-amber-500/10'
+                                : 'border-slate-800 text-slate-400 hover:text-amber-400 hover:border-amber-500/30'
+                            }`}
+                          >
+                            <Pin className={`w-4 h-4 ${(product.is_pinned || product.isPinned) ? 'fill-amber-400' : ''}`} />
+                          </button>
                           <button
                             onClick={() => onEditProduct(product)}
                             title="Editar Produto"

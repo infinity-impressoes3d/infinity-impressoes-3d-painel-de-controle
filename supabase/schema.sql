@@ -26,12 +26,14 @@ create table if not exists products (
   collection_id uuid references collections(id) on delete set null,
   active boolean default true,
   is_free_shipping boolean default false,
+  is_pinned boolean default false,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
 
--- Garantir que a coluna is_free_shipping exista em tabelas já criadas
+-- Garantir que as colunas adicionais existam em tabelas já criadas
 alter table products add column if not exists is_free_shipping boolean default false;
+alter table products add column if not exists is_pinned boolean default false;
 
 -- 3. Tabela N:N (Muitos-para-Muitos) de Produtos e Coleções
 create table if not exists product_collections (
