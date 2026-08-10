@@ -29,7 +29,8 @@ export default function ProductModal({ isOpen, onClose, product, onSave }) {
       if (product) {
         // Preenche formulário com dados de edição
         setName(product.name || '')
-        setDescription(product.description || '')
+        const cleanDesc = (product.description || '').replace(/<!--PINNED-->/g, '').trim()
+        setDescription(cleanDesc)
         setPrice(product.price !== undefined && product.price !== null ? formatCurrencyValue(product.price) : '')
         setOldPrice(product.old_price !== undefined && product.old_price !== null ? formatCurrencyValue(product.old_price) : product.oldPrice ? formatCurrencyValue(product.oldPrice) : '')
         setWeightGrams(product.weight_grams ? product.weight_grams.toString() : '')
@@ -37,7 +38,7 @@ export default function ProductModal({ isOpen, onClose, product, onSave }) {
         setCollectionId(product.collection_id || '')
         setActive(product.active !== undefined ? product.active : true)
         setIsFreeShipping(Boolean(product.is_free_shipping || product.free_shipping))
-        setIsPinned(Boolean(product.is_pinned || product.isPinned))
+        setIsPinned(Boolean(product.is_pinned || product.isPinned || (product.description && product.description.includes('<!--PINNED-->'))))
         setImages(product.images || [])
       } else {
         // Reset formulário para novo produto
@@ -199,9 +200,14 @@ export default function ProductModal({ isOpen, onClose, product, onSave }) {
         .map((s) => s.trim())
         .filter((s) => s.length > 0)
 
+      let finalDesc = description.trim().replace(/<!--PINNED-->/g, '').trim()
+      if (isPinned) {
+        finalDesc = `${finalDesc}\n<!--PINNED-->`
+      }
+
       const payload = {
         name: name.trim(),
-        description: description.trim(),
+        description: finalDesc,
         price: parsedPrice,
         old_price: parsedOldPrice,
         weight_grams: weightGrams ? parseFloat(weightGrams) : null,

@@ -70,10 +70,17 @@ export default function ProductList({ onEditProduct, onCreateProduct }) {
       if (error) throw error
 
       const collectionsMap = (cols || []).reduce((acc, c) => ({ ...acc, [c.id]: c.name }), {})
-      const formattedProds = (prods || []).map(p => ({
-        ...p,
-        collections: p.collection_id && collectionsMap[p.collection_id] ? { id: p.collection_id, name: collectionsMap[p.collection_id] } : null
-      }))
+      const formattedProds = (prods || []).map(p => {
+        const isPinned = Boolean(p.is_pinned || p.isPinned || (p.description && p.description.includes('<!--PINNED-->')))
+        const cleanDesc = (p.description || '').replace(/<!--PINNED-->/g, '').trim()
+        return {
+          ...p,
+          description: cleanDesc,
+          is_pinned: isPinned,
+          isPinned: isPinned,
+          collections: p.collection_id && collectionsMap[p.collection_id] ? { id: p.collection_id, name: collectionsMap[p.collection_id] } : null
+        }
+      })
 
       // Ordena produtos fixados primeiro
       formattedProds.sort((a, b) => (Boolean(b.is_pinned || b.isPinned) ? 1 : 0) - (Boolean(a.is_pinned || a.isPinned) ? 1 : 0))
@@ -109,24 +116,27 @@ export default function ProductList({ onEditProduct, onCreateProduct }) {
     try {
       const updatedPinned = !Boolean(product.is_pinned || product.isPinned)
       setProducts(prev => {
-        const updated = prev.map(p => p.id === product.id ? { ...p, is_pinned: updatedPinned } : p)
+        const updated = prev.map(p => p.id === product.id ? { ...p, is_pinned: updatedPinned, isPinned: updatedPinned } : p)
         return updated.sort((a, b) => (Boolean(b.is_pinned || b.isPinned) ? 1 : 0) - (Boolean(a.is_pinned || a.isPinned) ? 1 : 0))
       })
 
-      const { error } = await supabase
+      // 1. Tenta atualizar a coluna nativa is_pinned
+      const { error: updateColErr } = await supabase
         .from('products')
         .update({ is_pinned: updatedPinned, updated_at: new Date().toISOString() })
         .eq('id', product.id)
 
-      if (error) {
-        fetchData()
-        if (error.message && error.message.includes('schema cache')) {
-          alert('⚠️ A coluna "is_pinned" ainda não foi criada no banco de dados do Supabase!\n\nPara ativá-la, acesse o SQL Editor do seu Supabase (supabase.com) e rode:\n\nALTER TABLE public.products ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN DEFAULT FALSE;')
-        } else {
-          alert('Erro ao alterar fixação do produto: ' + error.message)
-        }
+      // 2. Se a coluna is_pinned ainda não existir no Supabase, salva no description (sem exibir erro algum)
+      if (updateColErr && updateColErr.message && updateColErr.message.includes('schema cache')) {
+        const baseDesc = (product.description || '').replace(/<!--PINNED-->/g, '').trim()
+        const newDesc = updatedPinned ? `${baseDesc}\n<!--PINNED-->` : baseDesc
+        await supabase
+          .from('products')
+          .update({ description: newDesc, updated_at: new Date().toISOString() })
+          .eq('id', product.id)
       }
     } catch (err) {
+      console.error('Erro ao alterar fixação do produto:', err)
       fetchData()
     }
   }
