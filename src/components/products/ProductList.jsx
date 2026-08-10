@@ -120,7 +120,11 @@ export default function ProductList({ onEditProduct, onCreateProduct }) {
 
       if (error) {
         fetchData()
-        alert('Erro ao alterar fixação do produto: ' + error.message)
+        if (error.message && error.message.includes('schema cache')) {
+          alert('⚠️ A coluna "is_pinned" ainda não foi criada no banco de dados do Supabase!\n\nPara ativá-la, acesse o SQL Editor do seu Supabase (supabase.com) e rode:\n\nALTER TABLE public.products ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN DEFAULT FALSE;')
+        } else {
+          alert('Erro ao alterar fixação do produto: ' + error.message)
+        }
       }
     } catch (err) {
       fetchData()

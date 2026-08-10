@@ -234,26 +234,27 @@ export default function ProductModal({ isOpen, onClose, product, onSave }) {
         saveError = insertError
       }
 
-      // Se uma coluna (ex: is_free_shipping) ainda não existir na tabela do Supabase remoto, tenta salvar sem a coluna
-      if (saveError && saveError.message && saveError.message.includes('schema cache')) {
+      // Se colunas ainda não existirem na tabela do Supabase remoto, tenta salvar removendo as colunas ausentes
+      while (saveError && saveError.message && saveError.message.includes('schema cache')) {
         const match = saveError.message.match(/Could not find the '([^']+)' column/)
-        const missingCol = match && match[1] ? match[1] : 'is_free_shipping'
-        if (Object.prototype.hasOwnProperty.call(payload, missingCol)) {
-          const fallbackPayload = { ...payload }
-          delete fallbackPayload[missingCol]
+        const missingCol = match && match[1] ? match[1] : null
+        if (missingCol && Object.prototype.hasOwnProperty.call(payload, missingCol)) {
+          delete payload[missingCol]
 
           if (product) {
             const { error: retryUpdateError } = await supabase
               .from('products')
-              .update(fallbackPayload)
+              .update(payload)
               .eq('id', product.id)
             saveError = retryUpdateError
           } else {
             const { error: retryInsertError } = await supabase
               .from('products')
-              .insert([fallbackPayload])
+              .insert([payload])
             saveError = retryInsertError
           }
+        } else {
+          break
         }
       }
 
