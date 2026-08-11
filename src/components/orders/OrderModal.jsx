@@ -41,6 +41,7 @@ export default function OrderModal({ isOpen, onClose, order = null, onSave }) {
   const [manualTotal, setManualTotal] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('pix')
   const [status, setStatus] = useState('paid')
+  const [statusEntrega, setStatusEntrega] = useState('imprimindo')
   const [orderDate, setOrderDate] = useState('')
   const [notes, setNotes] = useState('')
 
@@ -73,6 +74,8 @@ export default function OrderModal({ isOpen, onClose, order = null, onSave }) {
         setManualTotal(order.total_amount ? String(order.total_amount) : '')
         setPaymentMethod(order.payment_method || 'pix')
         setStatus(order.status || 'paid')
+        const initialDelivery = order.status_entrega || (order.comments && order.comments.match(/<!--DELIVERY:(imprimindo|a_caminho|entregue)-->/i)?.[1]) || 'imprimindo'
+        setStatusEntrega(initialDelivery)
         
         if (order.created_at) {
           const d = new Date(order.created_at)
@@ -81,7 +84,7 @@ export default function OrderModal({ isOpen, onClose, order = null, onSave }) {
           setOrderDate(new Date().toISOString().slice(0, 16))
         }
 
-        setNotes(order.notes || '')
+        setNotes(order.comments || order.notes || '')
       } else {
         // Reset formulário para nova venda
         setCustomerName('')
@@ -97,6 +100,7 @@ export default function OrderModal({ isOpen, onClose, order = null, onSave }) {
         setManualTotal('')
         setPaymentMethod('pix')
         setStatus('paid')
+        setStatusEntrega('imprimindo')
         
         // Data/Hora atual formatada para input datetime-local em fuso local
         const now = new Date()
@@ -161,6 +165,10 @@ export default function OrderModal({ isOpen, onClose, order = null, onSave }) {
           price: Number(i.price) || 0
         }))
 
+      const baseNotes = notes.trim()
+      const cleanNotes = baseNotes.replace(/<!--DELIVERY:[a-zA-Z_]+-->/g, '').trim()
+      const taggedNotes = cleanNotes ? `${cleanNotes}\n<!--DELIVERY:${statusEntrega}-->` : `<!--DELIVERY:${statusEntrega}-->`
+
       const payload = {
         customer_name: customerName.trim() || 'Cliente Balcão/Manual',
         customer_email: customerEmail.trim() || null,
@@ -171,23 +179,39 @@ export default function OrderModal({ isOpen, onClose, order = null, onSave }) {
         total_amount: Number(finalTotal) || 0,
         payment_method: paymentMethod,
         status: status,
+        status_entrega: statusEntrega,
+        comments: taggedNotes,
         created_at: orderDate ? new Date(orderDate).toISOString() : new Date().toISOString(),
         updated_at: new Date().toISOString()
       }
 
       if (order && order.id) {
         // Atualiza venda existente
-        const { error: updateErr } = await supabase
+        let { error: updateErr } = await supabase
           .from('orders')
           .update(payload)
           .eq('id', order.id)
 
+        if (updateErr && updateErr.message && updateErr.message.includes('status_entrega')) {
+          const fallback = { ...payload }
+          delete fallback.status_entrega
+          const { error: fbErr } = await supabase.from('orders').update(fallback).eq('id', order.id)
+          updateErr = fbErr
+        }
+
         if (updateErr) throw updateErr
       } else {
         // Insere nova venda
-        const { error: insertErr } = await supabase
+        let { error: insertErr } = await supabase
           .from('orders')
           .insert([payload])
+
+        if (insertErr && insertErr.message && insertErr.message.includes('status_entrega')) {
+          const fallback = { ...payload }
+          delete fallback.status_entrega
+          const { error: fbErr } = await supabase.from('orders').insert([fallback])
+          insertErr = fbErr
+        }
 
         if (insertErr) throw insertErr
       }
@@ -457,7 +481,7 @@ export default function OrderModal({ isOpen, onClose, order = null, onSave }) {
             </div>
 
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Status da Venda</label>
+              <label className="block text-xs text-slate-400 mb-1">Status do Pagamento</label>
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
@@ -470,6 +494,21 @@ export default function OrderModal({ isOpen, onClose, order = null, onSave }) {
                 <option value="cancelled">❌ Cancelado</option>
               </select>
             </div>
+
+            {['paid', 'shipped', 'processing'].includes(status) && (
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Status da Entrega (Cliente)</label>
+                <select
+                  value={statusEntrega}
+                  onChange={(e) => setStatusEntrega(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-sky-400 font-bold focus:outline-none focus:border-sky-500"
+                >
+                  <option value="imprimindo">🖨️ 1. Imprimindo</option>
+                  <option value="a_caminho">🚚 2. A caminho</option>
+                  <option value="entregue">🎉 3. Entregue</option>
+                </select>
+              </div>
+            )}
 
             <div>
               <label className="block text-xs text-slate-400 mb-1">Data / Hora da Venda</label>

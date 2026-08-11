@@ -117,6 +117,78 @@ export default function OrderList() {
     }
   }
 
+  const getOrderDeliveryStatus = (order) => {
+    if (!order) return 'imprimindo'
+    if (order.status_entrega) return order.status_entrega
+    if (order.comments && order.comments.includes('<!--DELIVERY:')) {
+      const match = order.comments.match(/<!--DELIVERY:(imprimindo|a_caminho|entregue)-->/i)
+      if (match && match[1]) return match[1]
+    }
+    return 'imprimindo'
+  }
+
+  const setOrderDeliveryTagInComments = (comments, newStatus) => {
+    const cleanComments = (comments || '').replace(/<!--DELIVERY:[a-zA-Z_]+-->/g, '').trim()
+    return cleanComments ? `${cleanComments}\n<!--DELIVERY:${newStatus}-->` : `<!--DELIVERY:${newStatus}-->`
+  }
+
+  const handleUpdateDeliveryStatus = async (orderId, newDeliveryStatus) => {
+    try {
+      const now = new Date().toISOString()
+      const currentOrder = orders.find(o => o.id === orderId) || selectedOrder
+      const updatedComments = setOrderDeliveryTagInComments(currentOrder?.comments, newDeliveryStatus)
+
+      setOrders(orders.map(o => o.id === orderId ? { 
+        ...o, 
+        status_entrega: newDeliveryStatus, 
+        comments: updatedComments,
+        updated_at: now 
+      } : o))
+
+      if (selectedOrder && selectedOrder.id === orderId) {
+        setSelectedOrder({ 
+          ...selectedOrder, 
+          status_entrega: newDeliveryStatus, 
+          comments: updatedComments,
+          updated_at: now 
+        })
+      }
+
+      // Tenta atualizar a coluna status_entrega + comments + updated_at
+      let { error } = await supabase
+        .from('orders')
+        .update({ 
+          status_entrega: newDeliveryStatus, 
+          comments: updatedComments,
+          updated_at: now 
+        })
+        .eq('id', orderId)
+
+      // Fallback gracioso: se a coluna status_entrega ainda não existir no Supabase, grava nos comments + updated_at
+      if (error && error.message && error.message.includes('status_entrega')) {
+        const fallback = await supabase
+          .from('orders')
+          .update({ 
+            comments: updatedComments,
+            updated_at: now 
+          })
+          .eq('id', orderId)
+        error = fallback.error
+      }
+
+      if (error) {
+        console.error('Erro ao atualizar status de entrega:', error)
+        alert('Erro ao atualizar status de entrega: ' + error.message)
+        fetchOrders()
+      } else {
+        window.dispatchEvent(new Event('orders-updated'))
+      }
+    } catch (err) {
+      console.error('Erro:', err)
+      fetchOrders()
+    }
+  }
+
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return
 
@@ -312,7 +384,7 @@ export default function OrderList() {
                   <th className="py-3.5 px-4">Contato / Endereço</th>
                   <th className="py-3.5 px-4">Itens</th>
                   <th className="py-3.5 px-4">Total</th>
-                  <th className="py-3.5 px-4">Status</th>
+                  <th className="py-3.5 px-4">Status / Entrega</th>
                   <th className="py-3.5 px-4 text-right">Ação Rápida</th>
                 </tr>
               </thead>
@@ -377,24 +449,46 @@ export default function OrderList() {
                         R$ {Number(order.total_amount).toFixed(2).replace('.', ',')}
                       </td>
 
-                      {/* Status */}
+                      {/* Status Pagamento e Entrega */}
                       <td className="py-3.5 px-4">
-                        <select
-                          value={order.status}
-                          onChange={(e) => handleUpdateStatus(order.id, e.target.value)}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-semibold border bg-slate-950 focus:outline-none cursor-pointer ${
-                            isPaid
-                              ? 'text-emerald-400 border-emerald-500/30'
-                              : isAbandoned
-                              ? 'text-amber-400 border-amber-500/30'
-                              : 'text-slate-400 border-slate-800'
-                          }`}
-                        >
-                          <option value="abandoned">⚠️ Abandonado</option>
-                          <option value="paid">✅ Pago</option>
-                          <option value="shipped">🚚 Enviado</option>
-                          <option value="cancelled">❌ Cancelado</option>
-                        </select>
+                        <div className="flex flex-col gap-1.5 min-w-[130px]">
+                          {/* Status Pagamento */}
+                          <select
+                            value={order.status}
+                            onChange={(e) => handleUpdateStatus(order.id, e.target.value)}
+                            className={`px-2 py-1 rounded-lg text-xs font-semibold border bg-slate-950 focus:outline-none cursor-pointer ${
+                              isPaid
+                                ? 'text-emerald-400 border-emerald-500/30'
+                                : isAbandoned
+                                ? 'text-amber-400 border-amber-500/30'
+                                : 'text-slate-400 border-slate-800'
+                            }`}
+                          >
+                            <option value="abandoned">⚠️ Abandonado</option>
+                            <option value="paid">✅ Pago</option>
+                            <option value="shipped">🚚 Enviado</option>
+                            <option value="cancelled">❌ Cancelado</option>
+                          </select>
+
+                          {/* Status Entrega (Exibido apenas para pedidos Pagos) */}
+                          {isPaid && (
+                            <select
+                              value={getOrderDeliveryStatus(order)}
+                              onChange={(e) => handleUpdateDeliveryStatus(order.id, e.target.value)}
+                              className={`px-2 py-1 rounded-lg text-xs font-bold border bg-slate-950 focus:outline-none cursor-pointer ${
+                                getOrderDeliveryStatus(order) === 'entregue'
+                                  ? 'text-emerald-400 border-emerald-500/40'
+                                  : getOrderDeliveryStatus(order) === 'a_caminho'
+                                  ? 'text-sky-400 border-sky-500/40'
+                                  : 'text-amber-300 border-amber-500/40'
+                              }`}
+                            >
+                              <option value="imprimindo">🖨️ 1. Imprimindo</option>
+                              <option value="a_caminho">🚚 2. A caminho</option>
+                              <option value="entregue">🎉 3. Entregue</option>
+                            </select>
+                          )}
+                        </div>
                       </td>
 
                       {/* Ações */}
@@ -539,17 +633,17 @@ export default function OrderList() {
                 )}
               </div>
 
-              {/* Frete e Forma de Pagamento */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Frete, Forma de Pagamento e Controles de Status */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
                   <h4 className="font-semibold text-slate-400 uppercase tracking-wider text-[10px] mb-1.5 flex items-center gap-1.5">
                     <Truck className="w-3.5 h-3.5 text-slate-500" /> Método de Envio
                   </h4>
-                  <div className="font-medium text-white">
+                  <div className="font-medium text-white text-xs">
                     {selectedOrder.shipping_method || 'Correios / Transportadora'}
                   </div>
                   {selectedOrder.shipping_cost > 0 && (
-                    <div className="text-slate-400 mt-1">Frete: R$ {Number(selectedOrder.shipping_cost).toFixed(2).replace('.', ',')}</div>
+                    <div className="text-slate-400 text-xs mt-1">Frete: R$ {Number(selectedOrder.shipping_cost).toFixed(2).replace('.', ',')}</div>
                   )}
                 </div>
 
@@ -557,10 +651,53 @@ export default function OrderList() {
                   <h4 className="font-semibold text-slate-400 uppercase tracking-wider text-[10px] mb-1.5 flex items-center gap-1.5">
                     <CreditCard className="w-3.5 h-3.5 text-slate-500" /> Forma de Pagamento
                   </h4>
-                  <div className="font-medium text-white uppercase">
+                  <div className="font-medium text-white uppercase text-xs">
                     {selectedOrder.payment_method || 'Stripe (Cartão/PIX)'}
                   </div>
                 </div>
+
+                <div className="bg-slate-950 p-4 rounded-xl border border-indigo-500/30">
+                  <h4 className="font-semibold text-indigo-400 uppercase tracking-wider text-[10px] mb-1.5 flex items-center gap-1.5">
+                    <DollarSign className="w-3.5 h-3.5 text-indigo-400" /> Status da Venda / Pgto
+                  </h4>
+                  <select
+                    value={selectedOrder.status || 'paid'}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSelectedOrder({ ...selectedOrder, status: val });
+                      handleUpdateStatus(selectedOrder.id, val);
+                    }}
+                    className="w-full bg-slate-900 border border-indigo-500/40 rounded-lg px-2.5 py-1.5 text-xs text-indigo-300 font-bold focus:outline-none"
+                  >
+                    <option value="paid">✅ Pago (Confirmado)</option>
+                    <option value="shipped">📦 Enviado / Entregue</option>
+                    <option value="processing">⏳ Em Processamento</option>
+                    <option value="abandoned">⚠️ Checkout Abandonado</option>
+                    <option value="cancelled">❌ Cancelado</option>
+                  </select>
+                </div>
+
+                {isPaidStatus(selectedOrder.status) ? (
+                  <div className="bg-slate-950 p-4 rounded-xl border border-sky-500/30">
+                    <h4 className="font-semibold text-sky-400 uppercase tracking-wider text-[10px] mb-1.5 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-sky-400" /> Status Entrega (Cliente)
+                    </h4>
+                    <select
+                      value={getOrderDeliveryStatus(selectedOrder)}
+                      onChange={(e) => handleUpdateDeliveryStatus(selectedOrder.id, e.target.value)}
+                      className="w-full bg-slate-900 border border-sky-500/40 rounded-lg px-2.5 py-1.5 text-xs text-sky-300 font-bold focus:outline-none"
+                    >
+                      <option value="imprimindo">🖨️ 1. Imprimindo</option>
+                      <option value="a_caminho">🚚 2. A caminho</option>
+                      <option value="entregue">🎉 3. Entregue</option>
+                    </select>
+                  </div>
+                ) : (
+                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex flex-col justify-center">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Status Entrega</span>
+                    <span className="text-xs text-slate-500 italic mt-1">Disponível apenas após pagamento confirmado</span>
+                  </div>
+                )}
               </div>
 
               {/* Lista de Produtos no Carrinho */}
