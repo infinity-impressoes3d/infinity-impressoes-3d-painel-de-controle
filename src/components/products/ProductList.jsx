@@ -115,8 +115,16 @@ export default function ProductList({ onEditProduct, onCreateProduct }) {
   const handleTogglePinned = async (product) => {
     try {
       const updatedPinned = !Boolean(product.is_pinned || product.isPinned)
+      const baseDesc = (product.description || '').replace(/<!--PINNED-->/g, '').trim()
+      const newDesc = updatedPinned ? `${baseDesc}\n<!--PINNED-->` : baseDesc
+
       setProducts(prev => {
-        const updated = prev.map(p => p.id === product.id ? { ...p, is_pinned: updatedPinned, isPinned: updatedPinned } : p)
+        const updated = prev.map(p => p.id === product.id ? { 
+          ...p, 
+          is_pinned: updatedPinned, 
+          isPinned: updatedPinned,
+          description: newDesc
+        } : p)
         return updated.sort((a, b) => (Boolean(b.is_pinned || b.isPinned) ? 1 : 0) - (Boolean(a.is_pinned || a.isPinned) ? 1 : 0))
       })
 
@@ -128,8 +136,6 @@ export default function ProductList({ onEditProduct, onCreateProduct }) {
 
       // 2. Se a coluna is_pinned ainda não existir no Supabase, salva no description (sem exibir erro algum)
       if (updateColErr && updateColErr.message && updateColErr.message.includes('schema cache')) {
-        const baseDesc = (product.description || '').replace(/<!--PINNED-->/g, '').trim()
-        const newDesc = updatedPinned ? `${baseDesc}\n<!--PINNED-->` : baseDesc
         await supabase
           .from('products')
           .update({ description: newDesc, updated_at: new Date().toISOString() })
