@@ -44,24 +44,63 @@ export default function OrderList() {
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleting, setDeleting] = useState(false)
 
+  const getSafeAddress = (raw) => {
+    if (!raw) return {}
+    if (typeof raw === 'object') return raw
+    if (typeof raw === 'string') {
+      try {
+        const parsed = JSON.parse(raw)
+        if (parsed && typeof parsed === 'object') return parsed
+      } catch (e) {}
+      return { street: raw }
+    }
+    return {}
+  }
+
   useEffect(() => {
     fetchOrders()
 
+    // 1. Supabase Realtime Channel
     const channel = supabase
       .channel('admin-orders-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
-        fetchOrders()
+        fetchOrders(true)
       })
       .subscribe()
 
+    // 2. BroadcastChannel para sincronização instantânea entre abas
+    let bc = null
+    try {
+      bc = new BroadcastChannel('infinity-orders-channel')
+      bc.onmessage = () => {
+        fetchOrders(true)
+      }
+    } catch (e) {}
+
+    // 3. Polling automático leve a cada 3 segundos
+    const interval = setInterval(() => {
+      fetchOrders(true)
+    }, 3000)
+
+    // 4. Recarregar ao focar na aba
+    const handleFocus = () => fetchOrders(true)
+    const handleCustomUpdate = () => fetchOrders(true)
+
+    window.addEventListener('focus', handleFocus)
+    window.addEventListener('orders-updated', handleCustomUpdate)
+
     return () => {
       supabase.removeChannel(channel)
+      clearInterval(interval)
+      if (bc) bc.close()
+      window.removeEventListener('focus', handleFocus)
+      window.removeEventListener('orders-updated', handleCustomUpdate)
     }
   }, [])
 
-  const fetchOrders = async () => {
+  const fetchOrders = async (silent = false) => {
     try {
-      setLoading(true)
+      if (!silent) setLoading(true)
       const { data, error } = await supabase
         .from('orders')
         .select('*')
@@ -72,7 +111,7 @@ export default function OrderList() {
     } catch (err) {
       console.error('Erro ao buscar pedidos:', err.message)
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }
 
@@ -393,7 +432,7 @@ export default function OrderList() {
                   const itemsList = Array.isArray(order.items) ? order.items : []
                   const isAbandoned = order.status === 'abandoned'
                   const isPaid = order.status === 'paid' || order.status === 'shipped'
-                  const addr = order.shipping_address || {}
+                  const addr = getSafeAddress(order.shipping_address)
 
                   return (
                     <tr key={order.id} className="hover:bg-slate-800/40 transition-colors">
@@ -401,7 +440,9 @@ export default function OrderList() {
                       <td className="py-3.5 px-4">
                         <div className="font-semibold text-white text-sm flex items-center gap-2">
                           <User className="w-4 h-4 text-slate-500" />
-                          {order.customer_name}
+                          {order.customer_name && order.customer_name !== 'Cliente em Checkout' 
+                            ? order.customer_name 
+                            : (order.customer_email ? order.customer_email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Cliente em Checkout')}
                         </div>
                         <div className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
                           <Mail className="w-3 h-3 text-slate-500" />
@@ -597,41 +638,47 @@ export default function OrderList() {
               </div>
 
               {/* Endereço de Entrega Completo */}
-              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
-                <h4 className="font-semibold text-indigo-400 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5" /> Endereço de Entrega Completo
-                </h4>
-                {selectedOrder.shipping_address && Object.keys(selectedOrder.shipping_address).length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1 text-slate-300">
-                    <div>
-                      <span className="text-slate-500 block">Logradouro / Rua:</span>
-                      <span className="font-medium text-white">{selectedOrder.shipping_address.street || selectedOrder.shipping_address.logradouro || 'Não informado'}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block">Número:</span>
-                      <span className="font-medium text-white">{selectedOrder.shipping_address.number || 'S/N'}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block">Complemento:</span>
-                      <span className="font-medium text-white">{selectedOrder.shipping_address.complement || 'Sem complemento'}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block">Bairro:</span>
-                      <span className="font-medium text-white">{selectedOrder.shipping_address.neighborhood || selectedOrder.shipping_address.bairro || 'Não informado'}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block">Cidade / UF:</span>
-                      <span className="font-medium text-white">{selectedOrder.shipping_address.city || selectedOrder.shipping_address.localidade || ''} - {selectedOrder.shipping_address.state || selectedOrder.shipping_address.uf || ''}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block">CEP:</span>
-                      <span className="font-mono text-indigo-300">{selectedOrder.shipping_address.cep || 'Não informado'}</span>
-                    </div>
+              {(() => {
+                const modalAddr = getSafeAddress(selectedOrder.shipping_address);
+                const hasAddr = modalAddr && Object.keys(modalAddr).length > 0 && (modalAddr.street || modalAddr.logradouro || modalAddr.city || modalAddr.localidade || modalAddr.cep || modalAddr.number || modalAddr.numero);
+                return (
+                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+                    <h4 className="font-semibold text-indigo-400 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5" /> Endereço de Entrega Completo
+                    </h4>
+                    {hasAddr ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1 text-slate-300">
+                        <div>
+                          <span className="text-slate-500 block">Logradouro / Rua:</span>
+                          <span className="font-medium text-white">{modalAddr.street || modalAddr.logradouro || 'Não informado'}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500 block">Número:</span>
+                          <span className="font-medium text-white">{modalAddr.number || modalAddr.numero || 'S/N'}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500 block">Complemento:</span>
+                          <span className="font-medium text-white">{modalAddr.complement || modalAddr.complemento || 'Sem complemento'}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500 block">Bairro:</span>
+                          <span className="font-medium text-white">{modalAddr.neighborhood || modalAddr.bairro || 'Não informado'}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500 block">Cidade / UF:</span>
+                          <span className="font-medium text-white">{modalAddr.city || modalAddr.localidade || ''} {modalAddr.state || modalAddr.uf ? `- ${modalAddr.state || modalAddr.uf}` : ''}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500 block">CEP:</span>
+                          <span className="font-mono text-indigo-300">{modalAddr.cep || 'Não informado'}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-slate-500 italic py-1">Endereço ainda não preenchido pelo cliente.</div>
+                    )}
                   </div>
-                ) : (
-                  <div className="text-slate-500 italic py-1">Endereço ainda não preenchido pelo cliente.</div>
-                )}
-              </div>
+                );
+              })()}
 
               {/* Frete, Forma de Pagamento e Controles de Status */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

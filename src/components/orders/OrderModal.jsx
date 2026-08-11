@@ -30,6 +30,8 @@ export default function OrderModal({ isOpen, onClose, order = null, onSave }) {
   // Endereço
   const [cep, setCep] = useState('')
   const [street, setStreet] = useState('')
+  const [number, setNumber] = useState('')
+  const [complement, setComplement] = useState('')
   const [neighborhood, setNeighborhood] = useState('')
   const [city, setCity] = useState('')
   const [state, setState] = useState('')
@@ -54,12 +56,25 @@ export default function OrderModal({ isOpen, onClose, order = null, onSave }) {
         setCustomerPhone(order.customer_phone || '')
         setCustomerCpf(order.customer_cpf || '')
 
-        const addr = order.shipping_address || {}
+        let addr = order.shipping_address || {}
+        if (typeof addr === 'string') {
+          try {
+            addr = JSON.parse(addr)
+          } catch (e) {
+            addr = { street: addr }
+          }
+        }
+        if (!addr || typeof addr !== 'object') {
+          addr = {}
+        }
+
         setCep(addr.cep || '')
-        setStreet(addr.street || addr.address || '')
-        setNeighborhood(addr.neighborhood || '')
-        setCity(addr.city || '')
-        setState(addr.state || '')
+        setStreet(addr.street || addr.logradouro || addr.address || '')
+        setNumber(addr.number || addr.numero || '')
+        setComplement(addr.complement || addr.complemento || '')
+        setNeighborhood(addr.neighborhood || addr.bairro || '')
+        setCity(addr.city || addr.localidade || '')
+        setState(addr.state || addr.uf || '')
 
         if (Array.isArray(order.items) && order.items.length > 0) {
           setItems(order.items.map(i => ({
@@ -93,6 +108,8 @@ export default function OrderModal({ isOpen, onClose, order = null, onSave }) {
         setCustomerCpf('')
         setCep('')
         setStreet('')
+        setNumber('')
+        setComplement('')
         setNeighborhood('')
         setCity('')
         setState('')
@@ -147,13 +164,29 @@ export default function OrderModal({ isOpen, onClose, order = null, onSave }) {
     setError('')
 
     try {
-      // Formata endereço
+      // Formata endereço com redundância total (chaves em inglês e português)
+      const cleanNumber = number.trim()
+      const cleanComplement = complement.trim()
+      const cleanStreet = street.trim()
+      const cleanNeighborhood = neighborhood.trim()
+      const cleanCity = city.trim()
+      const cleanState = state.trim()
+      const cleanCep = cep.trim()
+
       const shippingAddress = {
-        cep: cep.trim(),
-        street: street.trim(),
-        neighborhood: neighborhood.trim(),
-        city: city.trim(),
-        state: state.trim()
+        cep: cleanCep,
+        street: cleanStreet,
+        logradouro: cleanStreet,
+        number: cleanNumber,
+        numero: cleanNumber,
+        complement: cleanComplement,
+        complemento: cleanComplement,
+        neighborhood: cleanNeighborhood,
+        bairro: cleanNeighborhood,
+        city: cleanCity,
+        localidade: cleanCity,
+        state: cleanState,
+        uf: cleanState
       }
 
       // Limpa itens vazios
@@ -216,6 +249,7 @@ export default function OrderModal({ isOpen, onClose, order = null, onSave }) {
         if (insertErr) throw insertErr
       }
 
+      window.dispatchEvent(new Event('orders-updated'))
       if (onSave) onSave()
       onClose()
     } catch (err) {
@@ -321,6 +355,8 @@ export default function OrderModal({ isOpen, onClose, order = null, onSave }) {
             <div className="flex items-center gap-2 text-xs font-semibold text-indigo-400 uppercase tracking-wider">
               <MapPin className="w-4 h-4" /> Endereço de Entrega (Opcional)
             </div>
+            
+            {/* Grid Linha 1: CEP e Rua */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs text-slate-400 mb-1">CEP</label>
@@ -333,15 +369,45 @@ export default function OrderModal({ isOpen, onClose, order = null, onSave }) {
                 />
               </div>
               <div className="sm:col-span-2">
-                <label className="block text-xs text-slate-400 mb-1">Rua / Logradouro e Número</label>
+                <label className="block text-xs text-slate-400 mb-1">Rua / Logradouro</label>
                 <input
                   type="text"
-                  placeholder="Ex: Av. Paulista, 1000"
+                  placeholder="Ex: Av. Paulista ou Rua das Flores"
                   value={street}
                   onChange={(e) => setStreet(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition-colors"
                 />
               </div>
+            </div>
+
+            {/* Grid Linha 2: Número e Complemento */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">
+                  Número <span className="text-emerald-400 font-bold">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: 1234 ou S/N"
+                  value={number}
+                  onChange={(e) => setNumber(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition-colors"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-xs text-slate-400 mb-1">Complemento</label>
+                <input
+                  type="text"
+                  placeholder="Ex: Apto 102, Bloco B, Casa dos Fundos"
+                  value={complement}
+                  onChange={(e) => setComplement(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition-colors"
+                />
+              </div>
+            </div>
+
+            {/* Grid Linha 3: Bairro, Cidade e Estado */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs text-slate-400 mb-1">Bairro</label>
                 <input
