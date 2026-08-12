@@ -153,6 +153,57 @@ export default function OrderModal({ isOpen, onClose, order = null, onSave }) {
     }
   }, [isOpen, order])
 
+  // Formatadores dinâmicos de máscara
+  const handleCustomerPhoneChange = (e) => {
+    let v = e.target.value.replace(/\D/g, '').slice(0, 11)
+    let formatted = v
+    if (v.length > 10) {
+      formatted = v.replace(/^(\d\d)(\d{5})(\d{4}).*/, '($1) $2-$3')
+    } else if (v.length > 5) {
+      formatted = v.replace(/^(\d\d)(\d{4,5})(\d{0,4}).*/, '($1) $2-$3')
+    } else if (v.length > 2) {
+      formatted = v.replace(/^(\d\d)(\d{0,5}).*/, '($1) $2')
+    }
+    setCustomerPhone(formatted)
+  }
+
+  const handleCustomerCpfChange = (e) => {
+    let v = e.target.value.replace(/\D/g, '').slice(0, 14)
+    if (v.length <= 11) {
+      v = v.replace(/(\d{3})(\d)/, '$1.$2')
+      v = v.replace(/(\d{3})(\d)/, '$1.$2')
+      v = v.replace(/(\d{3})(\d{1,2})$/, '$1-$2')
+    } else {
+      v = v.replace(/^(\d{2})(\d)/, '$1.$2')
+      v = v.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
+      v = v.replace(/\.(\d{3})(\d)/, '.$1/$2')
+      v = v.replace(/(\d{4})(\d)/, '$1-$2')
+    }
+    setCustomerCpf(v)
+  }
+
+  const handleCepChange = (e) => {
+    let raw = e.target.value.replace(/\D/g, '').slice(0, 8)
+    let masked = raw
+    if (raw.length > 5) {
+      masked = `${raw.slice(0, 5)}-${raw.slice(5)}`
+    }
+    setCep(masked)
+    if (raw.length === 8) {
+      fetch(`https://viacep.com.br/ws/${raw}/json/`)
+        .then(res => res.json())
+        .then(data => {
+          if (!data.erro) {
+            if (data.logradouro && !street) setStreet(data.logradouro)
+            if (data.bairro && !neighborhood) setNeighborhood(data.bairro)
+            if (data.localidade && !city) setCity(data.localidade)
+            if (data.uf && !state) setState(data.uf)
+          }
+        })
+        .catch(() => {})
+    }
+  }
+
   if (!isOpen) return null
 
   // Cálculo automático do subtotal dos itens
@@ -342,9 +393,9 @@ export default function OrderModal({ isOpen, onClose, order = null, onSave }) {
                 <label className="block text-xs text-slate-400 mb-1">WhatsApp / Telefone</label>
                 <input
                   type="text"
-                  placeholder="Ex: 11999998888"
+                  placeholder="Ex: (11) 99999-8888"
                   value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  onChange={handleCustomerPhoneChange}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition-colors"
                 />
               </div>
@@ -366,7 +417,7 @@ export default function OrderModal({ isOpen, onClose, order = null, onSave }) {
                   type="text"
                   placeholder="Ex: 000.000.000-00 (Opcional)"
                   value={customerCpf}
-                  onChange={(e) => setCustomerCpf(e.target.value)}
+                  onChange={handleCustomerCpfChange}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition-colors"
                 />
               </div>
@@ -389,7 +440,7 @@ export default function OrderModal({ isOpen, onClose, order = null, onSave }) {
                   type="text"
                   placeholder="Ex: 01000-000"
                   value={cep}
-                  onChange={(e) => setCep(e.target.value)}
+                  onChange={handleCepChange}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition-colors"
                 />
               </div>
