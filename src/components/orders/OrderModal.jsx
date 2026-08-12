@@ -92,14 +92,39 @@ export default function OrderModal({ isOpen, onClose, order = null, onSave }) {
         const initialDelivery = order.status_entrega || (order.comments && order.comments.match(/<!--DELIVERY:(imprimindo|a_caminho|entregue)-->/i)?.[1]) || 'imprimindo'
         setStatusEntrega(initialDelivery)
         
-        if (order.created_at) {
-          const d = new Date(order.created_at)
-          setOrderDate(d.toISOString().slice(0, 16))
-        } else {
-          setOrderDate(new Date().toISOString().slice(0, 16))
-        }
-
         setNotes(order.comments || order.notes || '')
+
+        // Busca a versão mais atualizada diretamente do banco de dados para garantir sincronia em tempo real
+        if (order.id) {
+          supabase
+            .from('orders')
+            .select('*')
+            .eq('id', order.id)
+            .single()
+            .then(({ data }) => {
+              if (data) {
+                if (data.customer_name && data.customer_name !== 'Cliente em Checkout') setCustomerName(data.customer_name)
+                if (data.customer_email) setCustomerEmail(data.customer_email)
+                if (data.customer_phone) setCustomerPhone(data.customer_phone)
+                if (data.customer_cpf) setCustomerCpf(data.customer_cpf)
+                
+                let freshAddr = data.shipping_address || {}
+                if (typeof freshAddr === 'string') {
+                  try { freshAddr = JSON.parse(freshAddr) } catch(e) {}
+                }
+                if (freshAddr && typeof freshAddr === 'object') {
+                  if (freshAddr.cep) setCep(freshAddr.cep)
+                  if (freshAddr.street || freshAddr.logradouro) setStreet(freshAddr.street || freshAddr.logradouro)
+                  if (freshAddr.number || freshAddr.numero) setNumber(freshAddr.number || freshAddr.numero)
+                  if (freshAddr.complement || freshAddr.complemento) setComplement(freshAddr.complement || freshAddr.complemento)
+                  if (freshAddr.neighborhood || freshAddr.bairro) setNeighborhood(freshAddr.neighborhood || freshAddr.bairro)
+                  if (freshAddr.city || freshAddr.localidade) setCity(freshAddr.city || freshAddr.localidade)
+                  if (freshAddr.state || freshAddr.uf) setState(freshAddr.state || freshAddr.uf)
+                }
+              }
+            })
+            .catch(() => {})
+        }
       } else {
         // Reset formulário para nova venda
         setCustomerName('')
