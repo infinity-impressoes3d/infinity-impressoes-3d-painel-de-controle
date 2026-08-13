@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import ConfirmDeleteModal from '../common/ConfirmDeleteModal'
 import OrderModal from './OrderModal'
+import InstagramOrderCardModal from './InstagramOrderCardModal'
 import { 
   ShoppingCart, 
   Search, 
@@ -14,6 +15,7 @@ import {
   Phone, 
   Mail, 
   Eye, 
+  Instagram,
   Trash2, 
   Filter,
   ExternalLink,
@@ -35,6 +37,7 @@ export default function OrderList() {
   const [search, setSearch] = useState('')
   const [activeSubTab, setActiveSubTab] = useState('all')
   const [selectedOrder, setSelectedOrder] = useState(null)
+  const [instagramOrder, setInstagramOrder] = useState(null)
 
   // Modal de Criação / Edição Manual de Vendas
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false)
@@ -561,6 +564,14 @@ export default function OrderList() {
                           </button>
 
                           <button
+                            onClick={() => setInstagramOrder(order)}
+                            title="Gerar Card para Postar no Instagram / Stories"
+                            className="p-2 rounded-lg bg-slate-950 border border-slate-800 hover:border-pink-500 text-slate-300 hover:text-pink-400 hover:bg-pink-950/20 transition-all"
+                          >
+                            <Instagram className="w-4 h-4 text-pink-400" />
+                          </button>
+
+                          <button
                             onClick={() => {
                               setEditingOrderModal(order)
                               setIsOrderModalOpen(true)
@@ -825,6 +836,13 @@ export default function OrderList() {
         onClose={() => setIsOrderModalOpen(false)}
         order={editingOrderModal}
         onSave={fetchOrders}
+      />
+
+      {/* Modal de Card para Instagram */}
+      <InstagramOrderCardModal
+        isOpen={Boolean(instagramOrder)}
+        onClose={() => setInstagramOrder(null)}
+        order={instagramOrder}
       />
     </div>
   )
