@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabaseClient'
-import { X, Upload, Trash2, Plus, Tag, Weight, DollarSign, Image as ImageIcon, AlertCircle, Heading1, Heading2, Bold, Italic, List, Link, Truck, Pin } from 'lucide-react'
+import { X, Upload, Trash2, Plus, Tag, Weight, DollarSign, Image as ImageIcon, AlertCircle, Heading1, Heading2, Bold, Italic, List, Link, Truck, Pin, Box } from 'lucide-react'
 
 export default function ProductModal({ isOpen, onClose, product, onSave }) {
   const [name, setName] = useState('')
@@ -8,6 +8,9 @@ export default function ProductModal({ isOpen, onClose, product, onSave }) {
   const [price, setPrice] = useState('')
   const [oldPrice, setOldPrice] = useState('')
   const [weightGrams, setWeightGrams] = useState('')
+  const [heightCm, setHeightCm] = useState('')
+  const [widthCm, setWidthCm] = useState('')
+  const [lengthCm, setLengthCm] = useState('')
   const [sizesInput, setSizesInput] = useState('')
   const [collectionId, setCollectionId] = useState('')
   const [active, setActive] = useState(true)
@@ -33,7 +36,10 @@ export default function ProductModal({ isOpen, onClose, product, onSave }) {
         setDescription(cleanDesc)
         setPrice(product.price !== undefined && product.price !== null ? formatCurrencyValue(product.price) : '')
         setOldPrice(product.old_price !== undefined && product.old_price !== null ? formatCurrencyValue(product.old_price) : product.oldPrice ? formatCurrencyValue(product.oldPrice) : '')
-        setWeightGrams(product.weight_grams ? product.weight_grams.toString() : '')
+        setWeightGrams(product.weight_grams !== undefined && product.weight_grams !== null ? product.weight_grams.toString() : '')
+        setHeightCm(product.height_cm !== undefined && product.height_cm !== null ? product.height_cm.toString() : '')
+        setWidthCm(product.width_cm !== undefined && product.width_cm !== null ? product.width_cm.toString() : '')
+        setLengthCm(product.length_cm !== undefined && product.length_cm !== null ? product.length_cm.toString() : '')
         setSizesInput(product.sizes ? product.sizes.join(', ') : '')
         setCollectionId(product.collection_id || '')
         setActive(product.active !== undefined ? product.active : true)
@@ -47,6 +53,9 @@ export default function ProductModal({ isOpen, onClose, product, onSave }) {
         setPrice('')
         setOldPrice('')
         setWeightGrams('')
+        setHeightCm('')
+        setWidthCm('')
+        setLengthCm('')
         setSizesInput('')
         setCollectionId('')
         setActive(true)
@@ -185,6 +194,12 @@ export default function ProductModal({ isOpen, onClose, product, onSave }) {
       return
     }
 
+    const parsedWeight = parseFloat(weightGrams)
+    if (!weightGrams || isNaN(parsedWeight) || parsedWeight <= 0) {
+      setError('O peso do produto em gramas é obrigatório e deve ser maior que zero.')
+      return
+    }
+
     const parsedOldPrice = oldPrice ? parseFloat(oldPrice.replace(',', '.')) : null
 
     if (images.length === 0) {
@@ -211,6 +226,9 @@ export default function ProductModal({ isOpen, onClose, product, onSave }) {
         price: parsedPrice,
         old_price: parsedOldPrice,
         weight_grams: weightGrams ? parseFloat(weightGrams) : null,
+        height_cm: heightCm ? parseFloat(heightCm) : null,
+        width_cm: widthCm ? parseFloat(widthCm) : null,
+        length_cm: lengthCm ? parseFloat(lengthCm) : null,
         sizes: sizesArray,
         collection_id: collectionId || null,
         active,
@@ -280,7 +298,6 @@ export default function ProductModal({ isOpen, onClose, product, onSave }) {
     } finally {
       setSaving(false)
     }
-
   }
 
   if (!isOpen) return null
@@ -389,8 +406,8 @@ export default function ProductModal({ isOpen, onClose, product, onSave }) {
                 </button>
                 <button
                   type="button"
-                  title="Lista (- item)"
-                  onClick={() => insertFormatting('\n- ')}
+                  title="Lista com Marcadores (- item)"
+                  onClick={() => insertFormatting('- ')}
                   className="p-1 px-2 text-xs font-bold text-slate-300 hover:text-indigo-400 hover:bg-slate-800 rounded flex items-center gap-1"
                 >
                   <List className="w-3.5 h-3.5" /> Lista
@@ -400,68 +417,59 @@ export default function ProductModal({ isOpen, onClose, product, onSave }) {
 
             <textarea
               ref={textareaRef}
-              required
               rows={4}
+              required
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Use # Título, **negrito**, *itálico* e - listas para formatar a descrição..."
-              className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl p-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none font-mono"
+              placeholder="Descreva o produto, materiais, acabamentos, cuidados... Use Markdown ou os botões acima para formatar."
+              className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl p-4 text-sm text-slate-100 placeholder-slate-500 focus:outline-none font-mono"
             />
           </div>
 
-          {/* Preços: Preço Atual (Por) e Preço Antigo (De) */}
+          {/* Preços, Peso e Tamanhos */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-                Preço de Venda / Por (R$) <span className="text-rose-400">*</span>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+                Preço de Venda (R$) <span className="text-rose-400">*</span>
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500 text-sm font-semibold">
-                  R$
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                  <DollarSign className="w-4 h-4" />
                 </div>
                 <input
                   type="text"
                   required
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
-                  onBlur={(e) => handlePriceBlur(e.target.value, setPrice)}
-                  placeholder="349.90"
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none"
+                  onBlur={() => handlePriceBlur(price, setPrice)}
+                  placeholder="0.00"
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl pl-9 pr-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none font-medium"
                 />
               </div>
-              <span className="text-[10px] text-slate-500 mt-1 block">
-                Valor normal com 2 casas decimais (ex: 349,90 vira 349.90).
-              </span>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-                Preço Antigo / De (R$) <span className="text-slate-500 font-normal">(Riscado)</span>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+                Preço Antigo / Riscado (R$) (Opcional)
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500 text-sm font-semibold">
-                  R$
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                  <DollarSign className="w-4 h-4" />
                 </div>
                 <input
                   type="text"
                   value={oldPrice}
                   onChange={(e) => setOldPrice(e.target.value)}
-                  onBlur={(e) => handlePriceBlur(e.target.value, setOldPrice)}
-                  placeholder="420.00"
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none"
+                  onBlur={() => handlePriceBlur(oldPrice, setOldPrice)}
+                  placeholder="0.00"
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl pl-9 pr-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none"
                 />
               </div>
-              <span className="text-[10px] text-slate-500 mt-1 block">
-                Aparecerá cortado (ex: <span className="line-through">De R$ 420,00</span>) mostrando desconto na vitrine.
-              </span>
             </div>
-          </div>
 
-          {/* Peso e Tamanhos */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
-                Peso em Gramas (Opcional)
+                Peso em Gramas <span className="text-rose-400">*</span>
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
@@ -470,9 +478,11 @@ export default function ProductModal({ isOpen, onClose, product, onSave }) {
                 <input
                   type="number"
                   step="1"
+                  min="1"
+                  required
                   value={weightGrams}
                   onChange={(e) => setWeightGrams(e.target.value)}
-                  placeholder="Ex: 1200"
+                  placeholder="Ex: 500"
                   className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl pl-9 pr-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none"
                 />
               </div>
@@ -495,6 +505,74 @@ export default function ProductModal({ isOpen, onClose, product, onSave }) {
                 />
               </div>
             </div>
+          </div>
+
+          {/* Dimensões do Pacote / Envio (Melhor Envio & Correios) */}
+          <div className="p-4 bg-slate-950/60 border border-slate-800 rounded-xl space-y-3">
+            <div className="flex items-center gap-2">
+              <Box className="w-4 h-4 text-indigo-400" />
+              <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                Dimensões do Pacote / Produto (Cálculo de Frete Correios)
+              </label>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-[11px] font-medium text-slate-400 mb-1">
+                  Altura (cm)
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    value={heightCm}
+                    onChange={(e) => setHeightCm(e.target.value)}
+                    placeholder="Ex: 6"
+                    className="w-full bg-slate-900 border border-slate-800 focus:border-indigo-500 rounded-xl px-3.5 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none"
+                  />
+                  <span className="absolute right-3 top-2 text-xs text-slate-500 pointer-events-none">cm</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-medium text-slate-400 mb-1">
+                  Largura (cm)
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    value={widthCm}
+                    onChange={(e) => setWidthCm(e.target.value)}
+                    placeholder="Ex: 11"
+                    className="w-full bg-slate-900 border border-slate-800 focus:border-indigo-500 rounded-xl px-3.5 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none"
+                  />
+                  <span className="absolute right-3 top-2 text-xs text-slate-500 pointer-events-none">cm</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-medium text-slate-400 mb-1">
+                  Profundidade / Comp. (cm)
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    value={lengthCm}
+                    onChange={(e) => setLengthCm(e.target.value)}
+                    placeholder="Ex: 16"
+                    className="w-full bg-slate-900 border border-slate-800 focus:border-indigo-500 rounded-xl px-3.5 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none"
+                  />
+                  <span className="absolute right-3 top-2 text-xs text-slate-500 pointer-events-none">cm</span>
+                </div>
+              </div>
+            </div>
+            <p className="text-[11px] text-slate-500">
+              * Se deixar em branco, o cálculo de frete utilizará automaticamente as medidas mínimas padrão (16x11x6 cm).
+            </p>
           </div>
 
           {/* Gerenciamento de Imagens */}
