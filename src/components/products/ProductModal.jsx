@@ -32,19 +32,38 @@ export default function ProductModal({ isOpen, onClose, product, onSave }) {
       if (product) {
         // Preenche formulário com dados de edição
         setName(product.name || '')
-        const cleanDesc = (product.description || '').replace(/<!--PINNED-->/g, '').trim()
+
+        let meta = null
+        try {
+          const metaMatch = (product.description || '').match(/<!--METADATA:(.*?)-->/)
+          if (metaMatch && metaMatch[1]) {
+            meta = JSON.parse(metaMatch[1])
+          }
+        } catch (e) {}
+
+        const cleanDesc = (product.description || '')
+          .replace(/<!--PINNED-->/g, '')
+          .replace(/<!--METADATA:.*?-->/g, '')
+          .trim()
         setDescription(cleanDesc)
         setPrice(product.price !== undefined && product.price !== null ? formatCurrencyValue(product.price) : '')
         setOldPrice(product.old_price !== undefined && product.old_price !== null ? formatCurrencyValue(product.old_price) : product.oldPrice ? formatCurrencyValue(product.oldPrice) : '')
-        setWeightGrams(product.weight_grams !== undefined && product.weight_grams !== null ? product.weight_grams.toString() : '')
-        setHeightCm(product.height_cm !== undefined && product.height_cm !== null ? product.height_cm.toString() : '')
-        setWidthCm(product.width_cm !== undefined && product.width_cm !== null ? product.width_cm.toString() : '')
-        setLengthCm(product.length_cm !== undefined && product.length_cm !== null ? product.length_cm.toString() : '')
+
+        const finalWeight = product.weight_grams ?? meta?.weight ?? (product.weightGrams ? product.weightGrams : '')
+        const finalHeight = product.height_cm ?? meta?.h ?? (product.height ? product.height : '')
+        const finalWidth = product.width_cm ?? meta?.w ?? (product.width ? product.width : '')
+        const finalLength = product.length_cm ?? meta?.l ?? (product.length ? product.length : '')
+
+        setWeightGrams(finalWeight !== '' && finalWeight !== null && finalWeight !== undefined ? finalWeight.toString() : '')
+        setHeightCm(finalHeight !== '' && finalHeight !== null && finalHeight !== undefined ? finalHeight.toString() : '')
+        setWidthCm(finalWidth !== '' && finalWidth !== null && finalWidth !== undefined ? finalWidth.toString() : '')
+        setLengthCm(finalLength !== '' && finalLength !== null && finalLength !== undefined ? finalLength.toString() : '')
+
         setSizesInput(product.sizes ? product.sizes.join(', ') : '')
         setCollectionId(product.collection_id || '')
         setActive(product.active !== undefined ? product.active : true)
-        setIsFreeShipping(Boolean(product.is_free_shipping || product.free_shipping))
-        setIsPinned(Boolean(product.is_pinned || product.isPinned || (product.description && product.description.includes('<!--PINNED-->'))))
+        setIsFreeShipping(Boolean(product.is_free_shipping || product.free_shipping || meta?.free))
+        setIsPinned(Boolean(product.is_pinned || product.isPinned || (product.description && product.description.includes('<!--PINNED-->')) || meta?.pinned))
         setImages(product.images || [])
       } else {
         // Reset formulário para novo produto
@@ -188,19 +207,28 @@ export default function ProductModal({ isOpen, onClose, product, onSave }) {
       return
     }
 
-    const parsedPrice = parseFloat(price.replace(',', '.'))
-    if (isNaN(parsedPrice) || parsedPrice <= 0) {
+    const parseNum = (val) => {
+      if (val === undefined || val === null || val === '') return null
+      const num = parseFloat(val.toString().replace(',', '.'))
+      return isNaN(num) ? null : num
+    }
+
+    const parsedPrice = parseNum(price)
+    if (parsedPrice === null || parsedPrice <= 0) {
       setError('Informe um preço de venda válido maior que zero.')
       return
     }
 
-    const parsedWeight = parseFloat(weightGrams)
-    if (!weightGrams || isNaN(parsedWeight) || parsedWeight <= 0) {
+    const parsedWeight = parseNum(weightGrams)
+    if (!weightGrams || parsedWeight === null || parsedWeight <= 0) {
       setError('O peso do produto em gramas é obrigatório e deve ser maior que zero.')
       return
     }
 
-    const parsedOldPrice = oldPrice ? parseFloat(oldPrice.replace(',', '.')) : null
+    const parsedOldPrice = oldPrice ? parseNum(oldPrice) : null
+    const parsedHeight = parseNum(heightCm)
+    const parsedWidth = parseNum(widthCm)
+    const parsedLength = parseNum(lengthCm)
 
     if (images.length === 0) {
       setError('Adicione pelo menos 1 imagem do produto.')
@@ -215,20 +243,35 @@ export default function ProductModal({ isOpen, onClose, product, onSave }) {
         .map((s) => s.trim())
         .filter((s) => s.length > 0)
 
-      let finalDesc = description.trim().replace(/<!--PINNED-->/g, '').trim()
+      let cleanBaseDesc = description.trim()
+        .replace(/<!--PINNED-->/g, '')
+        .replace(/<!--METADATA:.*?-->/g, '')
+        .trim()
+
+      const metaTag = {
+        h: parsedHeight,
+        w: parsedWidth,
+        l: parsedLength,
+        weight: parsedWeight,
+        free: isFreeShipping,
+        pinned: isPinned
+      }
+
+      let finalDesc = cleanBaseDesc
       if (isPinned) {
         finalDesc = `${finalDesc}\n<!--PINNED-->`
       }
+      finalDesc = `${finalDesc}\n<!--METADATA:${JSON.stringify(metaTag)}-->`
 
       const payload = {
         name: name.trim(),
         description: finalDesc,
         price: parsedPrice,
         old_price: parsedOldPrice,
-        weight_grams: weightGrams ? parseFloat(weightGrams) : null,
-        height_cm: heightCm ? parseFloat(heightCm) : null,
-        width_cm: widthCm ? parseFloat(widthCm) : null,
-        length_cm: lengthCm ? parseFloat(lengthCm) : null,
+        weight_grams: parsedWeight,
+        height_cm: parsedHeight,
+        width_cm: parsedWidth,
+        length_cm: parsedLength,
         sizes: sizesArray,
         collection_id: collectionId || null,
         active,
@@ -545,7 +588,7 @@ export default function ProductModal({ isOpen, onClose, product, onSave }) {
                     min="0"
                     value={widthCm}
                     onChange={(e) => setWidthCm(e.target.value)}
-                    placeholder="Ex: 11"
+                    placeholder="Ex: 6"
                     className="w-full bg-slate-900 border border-slate-800 focus:border-indigo-500 rounded-xl px-3.5 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none"
                   />
                   <span className="absolute right-3 top-2 text-xs text-slate-500 pointer-events-none">cm</span>

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import ConfirmDeleteModal from '../common/ConfirmDeleteModal'
-import { 
+import {
+  Box,
   Package, 
   Plus, 
   Search, 
@@ -16,8 +17,7 @@ import {
   CheckCircle,
   XCircle,
   Truck,
-  Pin
-} from 'lucide-react'
+  Pin } from 'lucide-react'
 
 export default function ProductList({ onEditProduct, onCreateProduct }) {
   const [products, setProducts] = useState([])
@@ -71,13 +71,36 @@ export default function ProductList({ onEditProduct, onCreateProduct }) {
 
       const collectionsMap = (cols || []).reduce((acc, c) => ({ ...acc, [c.id]: c.name }), {})
       const formattedProds = (prods || []).map(p => {
-        const isPinned = Boolean(p.is_pinned || p.isPinned || (p.description && p.description.includes('<!--PINNED-->')))
-        const cleanDesc = (p.description || '').replace(/<!--PINNED-->/g, '').trim()
+        let meta = null
+        try {
+          const metaMatch = (p.description || '').match(/<!--METADATA:(.*?)-->/)
+          if (metaMatch && metaMatch[1]) {
+            meta = JSON.parse(metaMatch[1])
+          }
+        } catch (e) {}
+
+        const isPinned = Boolean(p.is_pinned || p.isPinned || (p.description && p.description.includes('<!--PINNED-->')) || meta?.pinned)
+        const isFreeShipping = Boolean(p.is_free_shipping || p.free_shipping || meta?.free)
+        const height_cm = p.height_cm ?? meta?.h ?? null
+        const width_cm = p.width_cm ?? meta?.w ?? null
+        const length_cm = p.length_cm ?? meta?.l ?? null
+        const weight_grams = p.weight_grams ?? meta?.weight ?? null
+
+        const cleanDesc = (p.description || '')
+          .replace(/<!--PINNED-->/g, '')
+          .replace(/<!--METADATA:.*?-->/g, '')
+          .trim()
+
         return {
           ...p,
           description: cleanDesc,
           is_pinned: isPinned,
           isPinned: isPinned,
+          is_free_shipping: isFreeShipping,
+          height_cm,
+          width_cm,
+          length_cm,
+          weight_grams,
           collections: p.collection_id && collectionsMap[p.collection_id] ? { id: p.collection_id, name: collectionsMap[p.collection_id] } : null
         }
       })
@@ -115,26 +138,46 @@ export default function ProductList({ onEditProduct, onCreateProduct }) {
   const handleTogglePinned = async (product) => {
     try {
       const updatedPinned = !Boolean(product.is_pinned || product.isPinned)
-      const baseDesc = (product.description || '').replace(/<!--PINNED-->/g, '').trim()
-      const newDesc = updatedPinned ? `${baseDesc}\n<!--PINNED-->` : baseDesc
+      const baseDesc = (product.description || '')
+        .replace(/<!--PINNED-->/g, '')
+        .replace(/<!--METADATA:.*?-->/g, '')
+        .trim()
+
+      const metaTag = {
+        h: product.height_cm,
+        w: product.width_cm,
+        l: product.length_cm,
+        weight: product.weight_grams,
+        free: product.is_free_shipping,
+        pinned: updatedPinned
+      }
+
+      let newDesc = baseDesc
+      if (updatedPinned) {
+        newDesc = `${newDesc}\n<!--PINNED-->`
+      }
+      newDesc = `${newDesc}\n<!--METADATA:${JSON.stringify(metaTag)}-->`
 
       setProducts(prev => {
         const updated = prev.map(p => p.id === product.id ? { 
           ...p, 
           is_pinned: updatedPinned, 
           isPinned: updatedPinned,
-          description: newDesc
+          description: baseDesc
         } : p)
         return updated.sort((a, b) => (Boolean(b.is_pinned || b.isPinned) ? 1 : 0) - (Boolean(a.is_pinned || a.isPinned) ? 1 : 0))
       })
 
-      // 1. Tenta atualizar a coluna nativa is_pinned
+      // Atualiza no banco
       const { error: updateColErr } = await supabase
         .from('products')
-        .update({ is_pinned: updatedPinned, updated_at: new Date().toISOString() })
+        .update({ 
+          is_pinned: updatedPinned, 
+          description: newDesc,
+          updated_at: new Date().toISOString() 
+        })
         .eq('id', product.id)
 
-      // 2. Se a coluna is_pinned ainda não existir no Supabase, salva no description (sem exibir erro algum)
       if (updateColErr && updateColErr.message && updateColErr.message.includes('schema cache')) {
         await supabase
           .from('products')
@@ -324,6 +367,10 @@ export default function ProductList({ onEditProduct, onCreateProduct }) {
                             <span>Frete Grátis</span>
                           </div>
                         )}
+                        <div className="flex items-center gap-1.5 text-slate-400">
+                          <Box className="w-3.5 h-3.5 text-slate-500" />
+                          <span>{`${product.height_cm || 6}x${product.width_cm || 11}x${product.length_cm || 16} cm`}</span>
+                        </div>
                         <div className="flex items-center gap-1.5 text-slate-400">
                           <Weight className="w-3.5 h-3.5 text-slate-500" />
                           <span>{product.weight_grams ? `${product.weight_grams}g` : 'Peso nulo (não exibe)'}</span>
